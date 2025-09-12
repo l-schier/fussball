@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-config.py
 
 .vscode
 
@@ -131,4 +130,3 @@ dmypy.json
 # Pyre type checker
 .pyre/
 elo_log.txt
-config.py
