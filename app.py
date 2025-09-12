@@ -1,28 +1,34 @@
 from flask import Flask, render_template, request, redirect, url_for, abort
 import psycopg2
-from config import DATABASE_CONFIG
+from config import Settings
 from datetime import datetime, date, timedelta
 import math
-from flask import Flask
 import dash
 from dash import html, dcc
 from dash.dependencies import Input, Output
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objs as go
 from sqlalchemy import create_engine
-from config import DATABASE_CONFIG
 import dash_bootstrap_components as dbc
-import sys
-import os
 import pytz
 
 
+config = Settings()
 
-
-
+engine = create_engine(
+    f"postgresql://{config.user}:{config.password}@"
+    f"{config.host}/{config.database}"
+)
 
 app = Flask(__name__, template_folder='Templates')
+
+def get_connection():
+    return psycopg2.connect(
+        host=config.host,
+        database=config.database,
+        user=config.user,
+        password=config.password
+    )
 
 
 def get_player_match_id_by_timestamp_and_by_player_id(player1_id, player2_id, player3_id, player4_id, date, cur):
@@ -196,10 +202,10 @@ def calculate_point_factor(score_difference):
 def process_game_data(player1_name, player2_name, team1_score, player3_name, player4_name, team2_score,date):
     # Connect to the database
     conn = psycopg2.connect(
-        host=DATABASE_CONFIG['host'],
-        database=DATABASE_CONFIG['database'],
-        user=DATABASE_CONFIG['user'],
-        password=DATABASE_CONFIG['password']
+        host=config.host,
+        database=config.database,
+        user=config.user,
+        password=config.password
     )
 
     print("date is",date)
@@ -475,10 +481,10 @@ def process_game_data(player1_name, player2_name, team1_score, player3_name, pla
 def calculate_expected_score(player1_name, player2_name, player3_name, player4_name,):
    # Connect to the database
     conn = psycopg2.connect(
-        host=DATABASE_CONFIG['host'],
-        database=DATABASE_CONFIG['database'],
-        user=DATABASE_CONFIG['user'],
-        password=DATABASE_CONFIG['password']
+        host=config.host,
+        database=config.database,
+        user=config.user,
+        password=config.password
     )
 
     
@@ -532,10 +538,10 @@ def calculate_expected_score(player1_name, player2_name, player3_name, player4_n
 def get_players():
     try:
         conn = psycopg2.connect(
-            host=DATABASE_CONFIG['host'],
-            database=DATABASE_CONFIG['database'],
-            user=DATABASE_CONFIG['user'],
-            password=DATABASE_CONFIG['password']
+            host=config.host,
+            database=config.database,
+            user=config.user,
+            password=config.password
         )
         cursor = conn.cursor()
         query = "SELECT first_name FROM player WHERE active = true ORDER BY first_name ASC;"  # 
@@ -555,7 +561,7 @@ def get_players():
 
 def get_players_full_list():
     query = 'SELECT first_name FROM player ORDER BY first_name ASC'
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(query)
         players_full = cur.fetchall()
@@ -564,7 +570,7 @@ def get_players_full_list():
 
 def get_players_detailed_list():
     query = 'SELECT player_id, first_name, last_name, active FROM player ORDER BY first_name ASC'
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(query)
         players_full = cur.fetchall()
@@ -619,7 +625,7 @@ def get_latest_player_ratings(month=None, year=None):
         ORDER BY pr.rating DESC;
     '''
 
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(query, (start_date, end_date, start_date, end_date))
         player_ratings = cur.fetchall()
@@ -654,7 +660,7 @@ def get_match_list(month=None):
         WHERE M.match_timestamp >= %s AND M.match_timestamp <= %s
         ORDER BY M.match_timestamp DESC;
     '''
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(query, (start_date, end_date))
         print(start_date,end_date)
@@ -710,7 +716,7 @@ def create_game():
     return render_template('create_game.html', players=players)
 
 def get_last_match():
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT m.match_id as matchid,m.match_timestamp as time, p1.first_name AS player1_name, p2.first_name AS player2_name, p3.first_name AS player3_name, p4.first_name AS player4_name, m.winning_team_score AS team1_score, m.losing_team_score AS team2_score FROM Match m INNER JOIN Team wt ON m.winning_team_id = wt.team_id INNER JOIN Team lt ON m.losing_team_id = lt.team_id INNER JOIN Player p1 ON wt.team_player_1_id = p1.player_id INNER JOIN Player p2 ON wt.team_player_2_id = p2.player_id INNER JOIN Player p3 ON lt.team_player_1_id = p3.player_id INNER JOIN Player p4 ON lt.team_player_2_id = p4.player_id ORDER BY m.match_id DESC LIMIT 1;")
         last_match = cur.fetchone()
@@ -718,17 +724,15 @@ def get_last_match():
     return last_match
 
 def get_player_ratings_before_after():
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("WITH last_match AS (SELECT m.match_id as match_id, m.match_timestamp as match_time, wt.team_player_1_id AS player1_id, wt.team_player_2_id AS player2_id, lt.team_player_1_id AS player3_id, lt.team_player_2_id AS player4_id FROM Match m INNER JOIN Team wt ON m.winning_team_id = wt.team_id INNER JOIN Team lt ON m.losing_team_id = lt.team_id ORDER BY m.match_id DESC LIMIT 1), player_ratings AS (SELECT pm.player_id, pr.rating, pr.player_rating_timestamp, ROW_NUMBER() OVER (PARTITION BY pm.player_id ORDER BY pr.player_rating_timestamp DESC) AS rn FROM PlayerRating pr INNER JOIN PlayerMatch pm ON pr.player_match_id = pm.player_match_id WHERE pm.player_id IN (SELECT player1_id FROM last_match UNION ALL SELECT player2_id FROM last_match UNION ALL SELECT player3_id FROM last_match UNION ALL SELECT player4_id FROM last_match)) SELECT p.player_id, p.first_name, pr_before.rating AS rating_before, pr_after.rating AS rating_after FROM Player p LEFT JOIN player_ratings pr_before ON p.player_id = pr_before.player_id AND pr_before.rn = 2 LEFT JOIN player_ratings pr_after ON p.player_id = pr_after.player_id AND pr_after.rn = 1 WHERE p.player_id IN (SELECT player1_id FROM last_match UNION ALL SELECT player2_id FROM last_match UNION ALL SELECT player3_id FROM last_match UNION ALL SELECT player4_id FROM last_match) ORDER BY p.player_id;")
         results = cur.fetchall()
         
     return results
 
-import psycopg2
-
 def delete_last_match():
-    with psycopg2.connect(**DATABASE_CONFIG) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
 
         # Begin transaction
@@ -829,7 +833,7 @@ def add_player():
     if request.method == 'POST':
         first_name = request.form['first_name']
         last_name = request.form['last_name']
-        conn = psycopg2.connect(**DATABASE_CONFIG)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT nextval('player_id_seq')")
         id_next_player = cursor.fetchone()[0]
@@ -849,7 +853,7 @@ def edit_player(player_id):
         last_name = request.form['last_name']
         active = True if request.form.get('active') else False
 
-        with psycopg2.connect(**DATABASE_CONFIG) as conn:
+        with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE Player SET first_name = %s, last_name = %s, active = %s WHERE player_id = %s",
                             (first_name, last_name, active, player_id))
@@ -857,7 +861,7 @@ def edit_player(player_id):
 
         return redirect(url_for('players_list_showed'))
     else:
-        with psycopg2.connect(**DATABASE_CONFIG) as conn:
+        with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT player_id, first_name, last_name, active FROM Player WHERE player_id = %s", (player_id,))
                 player = cur.fetchone()
@@ -872,7 +876,7 @@ def delete_match():
     if request.method == 'POST':
         match_id = request.form['match_id']
 
-        with psycopg2.connect(**DATABASE_CONFIG) as conn:
+        with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     DELETE FROM playerrating WHERE player_match_id IN (
@@ -902,12 +906,7 @@ def do_more():
     return render_template('do_more.html')
 
 def get_player_id_metrics(player_name):
-    conn = psycopg2.connect(
-        host=DATABASE_CONFIG['host'],
-        database=DATABASE_CONFIG['database'],
-        user=DATABASE_CONFIG['user'],
-        password=DATABASE_CONFIG['password']
-    )
+    conn = get_connection()
     cur = conn.cursor()
 
     cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player_name,))
@@ -926,12 +925,7 @@ def player_stats_route():
         player_id = get_player_id_metrics(player_name) 
         
         # Query the database to get the player stats
-        conn = psycopg2.connect(
-            host=DATABASE_CONFIG['host'],
-            database=DATABASE_CONFIG['database'],
-            user=DATABASE_CONFIG['user'],
-            password=DATABASE_CONFIG['password']
-        )
+        conn = get_connection()
         cur = conn.cursor()
 
         # Total number of games played by the player
@@ -1101,8 +1095,8 @@ fontFormat = dict(family="Segoe UI, Roboto, Helvetica Neue, Helvetica, Microsoft
                   size=18,)
 
 engine = create_engine(
-    f"postgresql://{DATABASE_CONFIG['user']}:{DATABASE_CONFIG['password']}@"
-    f"{DATABASE_CONFIG['host']}/{DATABASE_CONFIG['database']}"
+    f"postgresql://{config.user}:{config.password}@"
+    f"{config.host}/{config.database}"
 )
 
 dash_app.layout = dbc.Container([
