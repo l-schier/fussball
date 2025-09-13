@@ -22,7 +22,7 @@ dependencies = [
     "python-dateutil==2.8.2",
     "pytz==2023.3",
     "setuptools>=80.9.0",
-    "sqlalchemy==1.4.29",
+    "sqlalchemy>2.0",
     "uiwiz>=0.2.0",
 ]
 
