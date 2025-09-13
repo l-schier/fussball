@@ -6,13 +6,16 @@ import logging
 import uvicorn
 from fussball.pages.default import default_route
 from fussball.pages.layout import Layout, pages
+from fussball.database.setup import _tempdir
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def lifespan(app: UiwizApp):
     logger.info("Starting up...")
-    yield
+    with _tempdir:
+        # Keep the temporary directory alive for the app lifetime
+        yield
     logger.info("Shutting down...")
 
 app = UiwizApp(lifespan=lifespan, title="Fussball App", page_definition_class=Layout, theme="dark")
@@ -39,4 +42,4 @@ async def not_found_exception_handler(request: Request, exc: Exception):
     )
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("fussball.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -312,8 +312,6 @@ def process_game_data(match_result: MatchResult, conn: Session):
     player4_new_rating = player4_rating + k4 * point_factor  * (team2_actual_score - player4_expected_score)
 
 
-    
-
     # Calculate the new Elo ratings for each team
     team1_new_rating = team1_rating + k5 * point_factor * (team1_actual_score - team1_expected_score)
     team2_new_rating = team2_rating + k6 * point_factor * (team2_actual_score - team2_expected_score)

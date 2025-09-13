@@ -7,5 +7,6 @@ class Settings(BaseSettings):
     user: str
     password: str
     port: str
+    env: str = "dev"
 
 settings = Settings()
