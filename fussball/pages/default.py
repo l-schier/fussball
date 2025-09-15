@@ -1,4 +1,3 @@
-from collections import namedtuple
 from datetime import datetime
 from typing import Optional
 from uiwiz import ui, PageRouter
@@ -10,8 +9,6 @@ from sqlalchemy import select
 from fussball.database.tables import Player
 
 default_route = PageRouter()
-
-Options = namedtuple("Options", ["label", "value"])
 
 class UploadMatch(BaseModel):
     player_1: str
@@ -28,23 +25,11 @@ class UploadMatch(BaseModel):
 
 def get_players(con: Connection):
     players = con.scalars(select(Player).filter(Player.active)).all()
-    return [Options(label=row.name, value=row.id) for row in players]
+    return [ui.dropdownItem(name=row.name, value=row.id) for row in players]
 
-
-@default_route.post("/match/submit")
-async def submit_match(data: UploadMatch):
-    print(data)
-    pass
-
-@default_route.page("/")
-async def default_page(con: Connection):
-    ui.element("h1", "Welcome to the Fussball App")
-    res = con.execute(text("SELECT 1+1 AS result"))
-    ui.element("p", "Dynamic value from DB:")
-    ui.element("pre", res.fetchall())
-
-    player_options = get_players(con)
-    with ui.form().classes("border border-base-content rounded-lg shadow-lg w-full items-center") as form:
+def form_setup(player_options: list[ui.dropdownItem]):
+    with ui.form().on_submit(submit_match, swap="outerHTML")\
+        .classes("border border-base-content rounded-lg shadow-lg w-full items-center") as form:
         form.attributes["autocomplete"] = "off"
         ui.element("h2", "Upload Match")
 
@@ -60,15 +45,31 @@ async def default_page(con: Connection):
             ui.label("Match Date")
         with ui.element().classes("flex items-center justify-center w-full"):
             ui.datepicker(name="date", value=datetime.now()).classes("input")
-        ui.button("Submit game").on_click(submit_match, swap="none").classes("btn-primary")
+        with ui.element().classes("flex items-center justify-center w-full"):
+            ui.button("Submit game").classes("btn-primary")
 
 
+@default_route.ui("/match/submit")
+async def submit_match(data: UploadMatch, con: Connection):
+    print(data)
+    form_setup(get_players(con))
+    ui.toast("Match submitted!").success()
 
-def draw_player_dropdown(player_name: str, options: list[Options]):
+@default_route.page("/")
+async def default_page(con: Connection):
+    ui.element("h1", "Welcome to the Fussball App")
+    res = con.execute(text("SELECT 1+1 AS result"))
+    ui.element("p", "Dynamic value from DB:")
+    ui.element("pre", res.fetchall())
+
+    player_options = get_players(con)
+    form_setup(player_options)
+
+def draw_player_dropdown(player_name: str, options: list[ui.dropdownItem]):
     with ui.element().classes("flex items-center justify-center gap-4 pb-2 w-full"):
         with ui.element().classes("flex flex-col items-center gap-4 w-full"):        
             ui.label(player_name)
-            Dropdown(
+            ui.dropdown(
                 name=player_name.lower().replace(" ", "_"),
                 items=options,
                 placeholder="Select player",
@@ -76,26 +77,4 @@ def draw_player_dropdown(player_name: str, options: list[Options]):
 
 def draw_score_input(score_name: str):
     with ui.element().classes("flex items-center justify-center gap-4 pb-2 w-full"):
-        i = ui.input(name=score_name.lower().replace(" ", "_"), placeholder="0-10").classes("w-1/4")
-        i.attributes["type"] = "number"
-        i.attributes["min"] = "0"
-        i.attributes["max"] = "10"
-
-
-    
-class Dropdown(ui.element):
-    root_class: str = "select "
-    root_size: str = "select-{size}"
-    _classes: str = "select-bordered w-full max-w-xs"
-
-    def __init__(self, name: str, items: list[Options], placeholder: Optional[str] = None) -> None:
-        super().__init__("select")
-        self.attributes["name"] = name
-        self.classes()
-        self.size(self._size)
-        with self:
-            if placeholder and placeholder not in [item.label for item in items]:
-                ui.element("option disabled selected", content=placeholder)
-            for v in items:
-                e = ui.element("option", content=v.label)
-                e.value = v.value
+        ui.number(name=score_name.lower().replace(" ", "_"), value=None, min=0, max=10, step=1, placeholder="0-10").classes("w-1/4")

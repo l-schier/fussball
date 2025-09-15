@@ -22,7 +22,7 @@ class Layout(PageDefinition):
             with self.drawer.drawer_content():
                 self.nav(self.drawer)
                 container = ui.container(padding="p-4")
-
+            
             with self.drawer.drawer_side():
                 with ui.element("ul").classes("flex-none block md:hidden w-full"):
                     for page in pages:
