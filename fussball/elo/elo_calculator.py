@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import math
 
-class matchResult(BaseModel):
+class MatchResult(BaseModel):
     player1_name: str
     player2_name: str
     team1_score: int
@@ -139,7 +139,7 @@ def get_player_id_by_name(player_name: str, conn: Session) -> int:
     return player_id[0]
 
 # Get the player ID of the players playing a match
-def get_player_id(match_result: matchResult, conn: Session) -> Players:
+def get_player_id(match_result: MatchResult, conn: Session) -> Players:
     player1_id = get_player_id_by_name(match_result.player1_name, conn)
     player2_id = get_player_id_by_name(match_result.player2_name, conn)
     player3_id = get_player_id_by_name(match_result.player3_name, conn)
@@ -161,7 +161,7 @@ def check_and_get_team_from_names(players: Players, conn: Session) -> tuple[int,
         team_player_1_id = team_player_1_id[0]
     return team_player_1_id
 
-def process_game_data(match_result: matchResult, conn: Session):
+def process_game_data(match_result: MatchResult, conn: Session):
     # Connect to the database
 
     print("date is", match_result.date)
