@@ -1,3 +1,6 @@
+import os
+import tempfile
+import uuid
 from flask import Flask, render_template, request, redirect, url_for, abort
 import psycopg2
 from config import Settings
@@ -11,46 +14,50 @@ import plotly.graph_objs as go
 from sqlalchemy import create_engine
 import dash_bootstrap_components as dbc
 import pytz
+from fussball.database.tables import Base, Player
+from sqlalchemy.orm import Session
 
 
 config = Settings()
 
-engine = create_engine(
-    f"postgresql://{config.user}:{config.password}@"
-    f"{config.host}/{config.database}"
-)
+_tempdir = tempfile.TemporaryDirectory()
+_tempdir.__enter__()
+db_path = os.path.join(_tempdir.name, "dev.sqlite3")
+engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+Base.metadata.create_all(engine)
+players = [Player(name=f"player_{i}", active=True) for i in range(1, 5)]
+
+with Session(engine) as session:
+    session.add_all(players)
+    session.commit()
 
 app = Flask(__name__, template_folder='Templates')
 
 def get_connection():
-    return psycopg2.connect(
-        host=config.host,
-        database=config.database,
-        user=config.user,
-        password=config.password
-    )
+    return engine.raw_connection()
 
 
 def get_player_match_id_by_timestamp_and_by_player_id(player1_id, player2_id, player3_id, player4_id, date, cur):
-        cur.execute("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = %s AND Match.match_timestamp =%s;", (player1_id, date))
+        date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+        cur.execute("SELECT player_match.id FROM match JOIN player_match ON match.id = player_match.match_id WHERE player_match.player_id = ? AND match.created_at =?;", (player1_id, date))
         player1_match_id = cur.fetchone()[0]
 
-        cur.execute("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = %s AND Match.match_timestamp =%s;", (player2_id, date))
+        cur.execute("SELECT player_match.id FROM match JOIN player_match ON match.id = player_match.match_id WHERE player_match.player_id = ? AND match.created_at =?;", (player2_id, date))
         player2_match_id = cur.fetchone()[0]
 
-        cur.execute("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = %s AND Match.match_timestamp =%s;", (player3_id, date))
+        cur.execute("SELECT player_match.id FROM match JOIN player_match ON match.id = player_match.match_id WHERE player_match.player_id = ? AND match.created_at =?;", (player3_id, date))
         player3_match_id = cur.fetchone()[0]
 
-        cur.execute("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = %s AND Match.match_timestamp =%s;", (player4_id, date))
+        cur.execute("SELECT player_match.id FROM match JOIN player_match ON match.id = player_match.match_id WHERE player_match.player_id = ? AND match.created_at =?;", (player4_id, date))
         player4_match_id = cur.fetchone()[0]
 
         return (player1_match_id, player2_match_id, player3_match_id, player4_match_id)
 
 def get_team_match_id_by_timestamp_and_by_team_id(team1_id,team2_id, date, cur):
-        cur.execute("SELECT TeamMatch.team_match_id FROM Match JOIN TeamMatch ON Match.match_id = TeamMatch.match_id WHERE TeamMatch.team_id =%s AND Match.match_timestamp =%s;", (team1_id, date))
+        cur.execute("SELECT team_match.id FROM match JOIN team_match ON match.id = team_match.match_id WHERE team_match.team_id =? AND match.created_at =?;", (team1_id, date))
         team_match1_id = cur.fetchone()[0]
 
-        cur.execute("SELECT TeamMatch.team_match_id FROM Match JOIN TeamMatch ON Match.match_id = TeamMatch.match_id WHERE TeamMatch.team_id =%s AND Match.match_timestamp =%s;", (team2_id, date))
+        cur.execute("SELECT team_match.id FROM match JOIN team_match ON match.id = team_match.match_id WHERE team_match.team_id =? AND match.created_at =?;", (team2_id, date))
         team_match2_id = cur.fetchone()[0]
         return (team_match1_id,team_match2_id)
 
@@ -59,22 +66,22 @@ def get_team_match_id_by_timestamp_and_by_team_id(team1_id,team2_id, date, cur):
 
 # Get the player ID of the players playing a match
 def get_player_id(player1_name, player2_name, player3_name, player4_name, cur):
-        cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player1_name,))
-        player1_id = cur.fetchone()[0]
+    cur.execute("SELECT id FROM player WHERE name=?;", (player1_name,))
+    player1_id = cur.fetchone()[0]
 
-        cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player2_name,))
-        player2_id = cur.fetchone()[0]
-
-
-        cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player3_name,))
-        player3_id = cur.fetchone()[0]
-
-        cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player4_name,))
-        player4_id = cur.fetchone()[0]
+    cur.execute("SELECT id FROM player WHERE name=?", (player2_name,))
+    player2_id = cur.fetchone()[0]
 
 
-        # Return a tuple containing all the player IDs
-        return (player1_id, player2_id, player3_id, player4_id)
+    cur.execute("SELECT id FROM player WHERE name=?", (player3_name,))
+    player3_id = cur.fetchone()[0]
+
+    cur.execute("SELECT id FROM player WHERE name=?", (player4_name,))
+    player4_id = cur.fetchone()[0]
+
+
+    # Return a tuple containing all the player IDs
+    return (player1_id, player2_id, player3_id, player4_id)
 
 
 
@@ -82,13 +89,12 @@ def get_player_id(player1_name, player2_name, player3_name, player4_name, cur):
 # Get the team ID of the teams playing a match
 def insert_team_or_get_team_id(player1_id, player2_id, player3_id, player4_id, cur):
      # Check if the first team already exists
-        cur.execute("SELECT team_id FROM team WHERE (team_player_1_id=%s AND team_player_2_id=%s) OR (team_player_1_id=%s AND team_player_2_id=%s)", (player1_id, player2_id, player2_id, player1_id))
+        cur.execute("SELECT id FROM team WHERE (team_player_1_id=? AND team_player_2_id=?) OR (team_player_1_id=? AND team_player_2_id=?)", (player1_id, player2_id, player2_id, player1_id))
         team1_id = cur.fetchone()
         if team1_id is None:
             # If the team does not exist, insert them into the teams table with a unique id
-            cur.execute("SELECT nextval('team_id_seq')")
-            id = cur.fetchone()[0]
-            cur.execute("INSERT INTO team (team_id, team_player_1_id, team_player_2_id) VALUES (%s, %s, %s)", (id, player1_id, player2_id))
+            id = str(uuid.uuid4())
+            cur.execute("INSERT INTO team (id, team_player_1_id, team_player_2_id) VALUES (?, ?, ?)", (id, player1_id, player2_id))
             team1_id = id
         else:
             # If the team already exists, retrieve their id
@@ -96,13 +102,12 @@ def insert_team_or_get_team_id(player1_id, player2_id, player3_id, player4_id, c
 
 
         # Check if the second team already exists
-        cur.execute("SELECT team_id FROM team WHERE (team_player_1_id=%s AND team_player_2_id=%s) OR (team_player_1_id=%s AND team_player_2_id=%s)", (player3_id, player4_id, player4_id, player3_id))
+        cur.execute("SELECT id FROM team WHERE (team_player_1_id=? AND team_player_2_id=?) OR (team_player_1_id=? AND team_player_2_id=?)", (player3_id, player4_id, player4_id, player3_id))
         team2_id = cur.fetchone()
         if team2_id is None:
             # If the team does not exist, insert them into the teams table with a unique id
-            cur.execute("SELECT nextval('team_id_seq')")
-            id = cur.fetchone()[0]
-            cur.execute("INSERT INTO team (team_id, team_player_1_id, team_player_2_id) VALUES (%s, %s, %s)", (id, player3_id, player4_id))
+            id = str(uuid.uuid4())
+            cur.execute("INSERT INTO team (id, team_player_1_id, team_player_2_id) VALUES (?, ?, ?)", (id, player3_id, player4_id))
             team2_id = id
 
         else:
@@ -113,16 +118,16 @@ def insert_team_or_get_team_id(player1_id, player2_id, player3_id, player4_id, c
         return (team1_id, team2_id)         
 
 def number_of_games_player(player1_id, player2_id, player3_id, player4_id, date, cur):
-    cur.execute("SELECT COUNT(*) FROM PlayerMatch pm  INNER JOIN Match m ON pm.match_id = m.match_id  WHERE pm.player_id =%s AND m.match_timestamp <=%s;", (player1_id, date))
+    cur.execute("SELECT COUNT(*) FROM player_match pm  INNER JOIN match m ON pm.match_id = m.id  WHERE pm.player_id =? AND m.created_at <=?;", (player1_id, date))
     number_of_game_player1 = cur.fetchone()[0] or 0
 
-    cur.execute("SELECT COUNT(*) FROM PlayerMatch pm  INNER JOIN Match m ON pm.match_id = m.match_id  WHERE pm.player_id =%s AND m.match_timestamp <=%s;", (player2_id, date))
+    cur.execute("SELECT COUNT(*) FROM player_match pm  INNER JOIN match m ON pm.match_id = m.id  WHERE pm.player_id =? AND m.created_at <=?;", (player2_id, date))
     number_of_game_player2 = cur.fetchone()[0] or 0
 
-    cur.execute("SELECT COUNT(*) FROM PlayerMatch pm  INNER JOIN Match m ON pm.match_id = m.match_id  WHERE pm.player_id =%s AND m.match_timestamp <=%s;", (player3_id, date))
+    cur.execute("SELECT COUNT(*) FROM player_match pm  INNER JOIN match m ON pm.match_id = m.id  WHERE pm.player_id =? AND m.created_at <=?;", (player3_id, date))
     number_of_game_player3 = cur.fetchone()[0] or 0
 
-    cur.execute("SELECT COUNT(*) FROM PlayerMatch pm  INNER JOIN Match m ON pm.match_id = m.match_id  WHERE pm.player_id =%s AND m.match_timestamp <=%s;", (player4_id, date))
+    cur.execute("SELECT COUNT(*) FROM player_match pm  INNER JOIN match m ON pm.match_id = m.id  WHERE pm.player_id =? AND m.created_at <=?;", (player4_id, date))
     number_of_game_player4 = cur.fetchone()[0] or 0
 
     # Return the number of games played by each player as a tuple
@@ -130,17 +135,17 @@ def number_of_games_player(player1_id, player2_id, player3_id, player4_id, date,
 
 
 def number_of_games_team(team1_id, team2_id,date, cur):
-    cur.execute("SELECT COUNT(*) FROM Match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team1_id,team1_id,date))
+    cur.execute("SELECT COUNT(*) FROM match WHERE (winning_team_id =? OR losing_team_id = ? ) AND created_at <=?", (team1_id,team1_id,date))
     number_of_game_team_1 = cur.fetchone()[0] or 0 
 
-    cur.execute("SELECT COUNT(*) FROM Match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team2_id,team2_id,date))
+    cur.execute("SELECT COUNT(*) FROM match WHERE (winning_team_id =? OR losing_team_id = ? ) AND created_at <=?", (team2_id,team2_id,date))
     number_of_game_team_2 = cur.fetchone()[0] or 0
     
      # Return the number of games played by each team as a tuple
     return (number_of_game_team_1, number_of_game_team_2)
              
 def get_player_ratings(player1_id, player2_id, player3_id, player4_id, cur):
-    cur.execute("SELECT rating, player_rating_timestamp FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE player_id = %s) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player1_id,))
+    cur.execute("SELECT rating, player_rating_timestamp FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE player_id = ?) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player1_id,))
 
     result = cur.fetchone()
     if result is not None:
@@ -149,14 +154,14 @@ def get_player_ratings(player1_id, player2_id, player3_id, player4_id, cur):
      player1_rating = 1500
 
 
-    cur.execute("SELECT rating, player_rating_timestamp FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE player_id = %s) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player2_id,))
+    cur.execute("SELECT rating, player_rating_timestamp FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE player_id = ?) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player2_id,))
     result = cur.fetchone()
     if result is not None:
         player2_rating = result[0]
     else:
      player2_rating = 1500
 
-    cur.execute("SELECT rating, player_rating_timestamp FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE player_id = %s) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player3_id,))
+    cur.execute("SELECT rating, player_rating_timestamp FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE player_id = ?) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player3_id,))
     result = cur.fetchone()
    
     if result is not None:
@@ -165,7 +170,7 @@ def get_player_ratings(player1_id, player2_id, player3_id, player4_id, cur):
      player3_rating = 1500
     
 
-    cur.execute("SELECT rating, player_rating_timestamp FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE player_id = %s) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player4_id,))
+    cur.execute("SELECT rating, player_rating_timestamp FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE player_id = ?) ORDER BY player_rating_timestamp DESC LIMIT 1;", (player4_id,))
     result = cur.fetchone()
     if result is not None:
         player4_rating = result[0]
@@ -176,7 +181,7 @@ def get_player_ratings(player1_id, player2_id, player3_id, player4_id, cur):
 
 
 def get_team_ratings(team1_id, team2_id, cur):
-    cur.execute("SELECT rating, team_rating_timestamp FROM teamrating WHERE team_match_id IN (SELECT team_match_id FROM teammatch WHERE team_id = %s) ORDER BY team_rating_timestamp DESC LIMIT 1;", (team1_id,))
+    cur.execute("SELECT rating, created_at FROM team_rating WHERE team_match_id IN (SELECT id FROM team_match WHERE team_id = ?) ORDER BY created_at DESC LIMIT 1;", (team1_id,))
     result = cur.fetchone()
     
     if result is not None:
@@ -184,7 +189,7 @@ def get_team_ratings(team1_id, team2_id, cur):
     else:
      team1_rating = 1500
 
-    cur.execute("SELECT rating, team_rating_timestamp FROM teamrating WHERE team_match_id IN (SELECT team_match_id FROM teammatch WHERE team_id = %s) ORDER BY team_rating_timestamp DESC LIMIT 1;", (team2_id,))
+    cur.execute("SELECT rating, created_at FROM team_rating WHERE team_match_id IN (SELECT id FROM team_match WHERE team_id = ?) ORDER BY created_at DESC LIMIT 1;", (team2_id,))
     result = cur.fetchone()
     if result is not None:
         team2_rating = result[0]
@@ -201,12 +206,7 @@ def calculate_point_factor(score_difference):
 
 def process_game_data(player1_name, player2_name, team1_score, player3_name, player4_name, team2_score,date):
     # Connect to the database
-    conn = psycopg2.connect(
-        host=config.host,
-        database=config.database,
-        user=config.user,
-        password=config.password
-    )
+    conn = get_connection()
 
     print("date is",date)
     
@@ -216,62 +216,58 @@ def process_game_data(player1_name, player2_name, team1_score, player3_name, pla
     # Check if the player name is not empty
     if player1_name:
       # Check if the player already exists in the Player table
-      cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player1_name,))
+      cur.execute("SELECT id FROM player WHERE name=?", (player1_name,))
       player1_id = cur.fetchone()
       if player1_id is None:
         # If the player does not exist, insert them into the players table with a unique id
-        cur.execute("SELECT nextval('player_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO player (player_id, first_name) VALUES (%s, %s)", (id, player1_name))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO player (id, name) VALUES (?, ?)", (id, player1_name))
         player1_id = id
       else:
-        # If the player already exists, retrieve their player_id
+        # If the player already exists, retrieve their id
         player1_id = player1_id[0]
       
 
 
-  # Check if the player2 first_name is not empty
+  # Check if the player2 name is not empty
     if player2_name:
       # Check if the player already exists in the Players table
-      cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player2_name,))
+      cur.execute("SELECT id FROM player WHERE name=?", (player2_name,))
       player2_id = cur.fetchone()
       if player2_id is None:
         # If the player does not exist, insert them into the players table with a unique id
-        cur.execute("SELECT nextval('player_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO player (player_id, first_name) VALUES (%s, %s)", (id, player2_name))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO player (id, name) VALUES (?, ?)", (id, player2_name))
         player2_id = id
       else:
         # If the player already exists, retrieve their player_id
         player2_id = player2_id[0]
   
 
-  # Check if the player3 first_name is not empty
+  # Check if the player3 name is not empty
     if player3_name:
       # Check if the player already exists in the Players table
-      cur.execute("SELECT player_id FROM player WHERE first_name=%s", (str(player3_name),))
+      cur.execute("SELECT id FROM player WHERE name=?", (str(player3_name),))
       player3_id = cur.fetchone()
       if player3_id is None:
         # If the player does not exist, insert them into the players table with a unique id
-        cur.execute("SELECT nextval('player_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO player (player_id, first_name) VALUES (%s, %s)", (id, player3_name))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO player (id, name) VALUES (?, ?)", (id, player3_name))
         player3_id = id
       else:
-        # If the player already exists, retrieve their player_id
-        player3_id = player3_id[0]  
+        # If the player already exists, retrieve their id
+        player3_id = player3_id[0]
 
 
-  # Check if the player4 first_name is not empty
+  # Check if the player4 name is not empty
     if player4_name:
       # Check if the player already exists in the Players table
-      cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player4_name,))
+      cur.execute("SELECT id FROM player WHERE name=?", (player4_name,))
       player4_id = cur.fetchone()
       if player4_id is None:
         # If the player does not exist, insert them into the players table with a unique id
-        cur.execute("SELECT nextval('player_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO player (player_id, first_name) VALUES (%s, %s)", (id, player4_name))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO player (id, name) VALUES (?, ?)", (id, player4_name))
         player4_id = id
       else:
         # If the player already exists, retrieve their id
@@ -279,31 +275,30 @@ def process_game_data(player1_name, player2_name, team1_score, player3_name, pla
 
 
   # Check if the team already exists in the Teams table
-      cur.execute("SELECT team_id FROM team WHERE (team_player_1_id=%s AND team_player_2_id=%s) OR (team_player_1_id=%s AND team_player_2_id=%s)", (player1_id, player2_id, player2_id, player1_id))
+      cur.execute("SELECT id FROM team WHERE (team_player_1_id=? AND team_player_2_id=?) OR (team_player_1_id=? AND team_player_2_id=?)", (player1_id, player2_id, player2_id, player1_id))
       team_player_1_id = cur.fetchone()
       if team_player_1_id is None:
         # If the team does not exist, insert them into the teams table with a unique id
-        cur.execute("SELECT nextval('team_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO team (team_id, team_player_1_id, team_player_2_id) VALUES (%s, %s, %s)", (id, player1_id, player2_id))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO team (id, team_player_1_id, team_player_2_id) VALUES (?, ?, ?)", (id, player1_id, player2_id))
         team_player_1_id = id
       else:
         # If the team already exists, retrieve their id
         team_player_1_id = team_player_1_id[0]  
       
   # Repeat the process for the other team
-      cur.execute("SELECT team_id FROM team WHERE (team_player_1_id=%s AND team_player_2_id=%s) OR (team_player_1_id=%s AND team_player_2_id=%s)", (player3_id, player4_id, player4_id, player3_id))
+      cur.execute("SELECT id FROM team WHERE (team_player_1_id=? AND team_player_2_id=?) OR (team_player_1_id=? AND team_player_2_id=?)", (player3_id, player4_id, player4_id, player3_id))
       team_player_2_id = cur.fetchone()
       if team_player_2_id is None:
-        cur.execute("SELECT nextval('team_id_seq')")
-        id = cur.fetchone()[0]
-        cur.execute("INSERT INTO team (team_id, team_player_1_id, team_player_2_id) VALUES (%s, %s, %s)", (id, player3_id, player4_id))
+        id = str(uuid.uuid4())
+        cur.execute("INSERT INTO team (id, team_player_1_id, team_player_2_id) VALUES (?, ?, ?)", (id, player3_id, player4_id))
         team_player_2_id = id
       else:
         team_player_2_id = team_player_2_id[0]    
 
 
   # Commit the changes to the database
+    
     conn.commit()
 
     # Function to check winning team
@@ -335,27 +330,29 @@ def process_game_data(player1_name, player2_name, team1_score, player3_name, pla
         winning_team_score = None
         losing_team_score = None  
 
-    cur.execute("SELECT * FROM match WHERE match_timestamp=%s AND winning_team_id=%s AND losing_team_id=%s AND winning_team_score=%s AND losing_team_score=%s", (date, winning_team_id, losing_team_id, winning_team_score, losing_team_score))
+    cur.execute("SELECT * FROM match WHERE created_at=? AND winning_team_id=? AND losing_team_id=? AND winning_team_score=? AND losing_team_score=?", (date, winning_team_id, losing_team_id, winning_team_score, losing_team_score))
     match = cur.fetchone()
     if match is None:
-            cur.execute("INSERT INTO match (match_timestamp, winning_team_id, losing_team_id, winning_team_score, losing_team_score) VALUES (%s, %s, %s, %s, %s)", (date, winning_team_id, losing_team_id, winning_team_score, losing_team_score))
+            id = str(uuid.uuid4())
+            cur.execute("INSERT INTO match (id, created_at, winning_team_id, losing_team_id, winning_team_score, losing_team_score) VALUES (?, ?, ?, ?, ?, ?)", (id, date, winning_team_id, losing_team_id, winning_team_score, losing_team_score))
             print(f'processing match: {date} with {player1_name} and {player2_name} vs {player3_name} and {player4_name}: {team1_score} - {team2_score}  ')
             conn.commit()
 
             # get the last of the matches
-            cur.execute("SELECT match_id FROM match ORDER BY match_id DESC LIMIT 1")
+            cur.execute("SELECT id FROM match ORDER BY id DESC LIMIT 1")
             match_id = cur.fetchone()[0]
           
-            # Insert the players into the PlayerMatch table
-            cur.execute("INSERT INTO PlayerMatch (player_id,match_id) VALUES (%s, %s)", (player1_id,match_id))
-            cur.execute("INSERT INTO PlayerMatch (player_id,match_id) VALUES (%s, %s)", (player2_id,match_id))
-            cur.execute("INSERT INTO PlayerMatch (player_id,match_id) VALUES (%s, %s)", (player3_id,match_id))
-            cur.execute("INSERT INTO PlayerMatch (player_id,match_id) VALUES (%s, %s)", (player4_id,match_id))
+            # Insert the players into the player_match table
 
-            # Insert the team into the TeamMatch table
-            cur.execute("INSERT INTO TeamMatch (team_id,match_id) VALUES (%s, %s)", (winning_team_id,match_id))
-            cur.execute("INSERT INTO TeamMatch (team_id,match_id) VALUES (%s, %s)", (losing_team_id,match_id))
-  
+            cur.execute("INSERT INTO player_match (id, player_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), player1_id, match_id))
+            cur.execute("INSERT INTO player_match (id, player_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), player2_id, match_id))
+            cur.execute("INSERT INTO player_match (id, player_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), player3_id, match_id))
+            cur.execute("INSERT INTO player_match (id, player_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), player4_id, match_id))
+
+            # Insert the team into the team_match table
+            cur.execute("INSERT INTO team_match (id, team_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), winning_team_id, match_id))
+            cur.execute("INSERT INTO team_match (id, team_id,match_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), losing_team_id, match_id))
+
     else:
         print(f'Skipping match      : {date} with {player1_name} and {player2_name} vs {player3_name} and {player4_name}: {team1_score} - {team2_score}  , the match already exist')
 
@@ -457,35 +454,33 @@ def process_game_data(player1_name, player2_name, team1_score, player3_name, pla
 
     # Update the database with the player ratings
     print("Inserting player rating for player 1 with match ID", player_match1_id, "and new rating", player1_new_rating)
-    cur.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match1_id, player1_new_rating, date))
+    cur.execute("INSERT INTO player_rating (id, player_match_id, rating, player_rating_timestamp) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), player_match1_id, player1_new_rating, date))
 
     print("Inserting player rating for player 2 with match ID", player_match2_id, "and new rating", player2_new_rating)
-    cur.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES ( %s, %s, %s)", (player_match2_id, player2_new_rating, date))
+    cur.execute("INSERT INTO player_rating (id, player_match_id, rating, player_rating_timestamp) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), player_match2_id, player2_new_rating, date))
 
     print("Inserting player rating for player 3 with match ID", player_match3_id, "and new rating", player3_new_rating)
-    cur.execute("INSERT INTO playerrating (player_match_id,rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match3_id,player3_new_rating, date))
+    cur.execute("INSERT INTO player_rating (id, player_match_id, rating, player_rating_timestamp) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), player_match3_id, player3_new_rating, date))
 
     print("Inserting player rating for player 4 with match ID", player_match4_id, "and new rating", player4_new_rating)
-    cur.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match4_id, player4_new_rating, date))
+    cur.execute("INSERT INTO player_rating (id, player_match_id, rating, player_rating_timestamp) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), player_match4_id, player4_new_rating, date))
 
     conn.commit()
 
     # Update the database with the team ratings
-    cur.execute("INSERT INTO teamrating (team_match_id, rating, team_rating_timestamp) VALUES (%s, %s, %s)", (team_match1_id, team1_new_rating, date))
-    cur.execute("INSERT INTO teamrating (team_match_id, rating, team_rating_timestamp) VALUES (%s, %s, %s)", (team_match2_id, team2_new_rating, date))
-  
-    conn.commit() 
+
+    cur.execute("INSERT INTO team_rating (id, team_match_id, rating, created_at) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), team_match1_id, team1_new_rating, date))
+    cur.execute("INSERT INTO team_rating (id, team_match_id, rating, created_at) VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), team_match2_id, team2_new_rating, date))
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 # Get the exptected score for odds   
 def calculate_expected_score(player1_name, player2_name, player3_name, player4_name,):
    # Connect to the database
-    conn = psycopg2.connect(
-        host=config.host,
-        database=config.database,
-        user=config.user,
-        password=config.password
-    )
+    conn = get_connection()
 
     
     # Create a cursor
@@ -537,17 +532,14 @@ def calculate_expected_score(player1_name, player2_name, player3_name, player4_n
 # Get the players from the database
 def get_players():
     try:
-        conn = psycopg2.connect(
-            host=config.host,
-            database=config.database,
-            user=config.user,
-            password=config.password
-        )
+        conn = get_connection()
         cursor = conn.cursor()
-        query = "SELECT first_name FROM player WHERE active = true ORDER BY first_name ASC;"  # 
+        query = "SELECT name FROM player WHERE active = true ORDER BY name ASC;"  # 
         cursor.execute(query)
         players = cursor.fetchall()
         print("Players fetched:", players)  # Add this line to print the fetched players
+        cursor.close()
+        conn.close()
         return [player[0] for player in players]
        
     except Exception as e:
@@ -560,20 +552,26 @@ def get_players():
             conn.close()
 
 def get_players_full_list():
-    query = 'SELECT first_name FROM player ORDER BY first_name ASC'
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(query)
-        players_full = cur.fetchall()
+    query = 'SELECT name FROM player ORDER BY name ASC'
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(query)
+    players_full = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
 
     return [player[0] for player in players_full]
 
 def get_players_detailed_list():
-    query = 'SELECT player_id, first_name, last_name, active FROM player ORDER BY first_name ASC'
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(query)
-        players_full = cur.fetchall()
+    query = 'SELECT id, name active FROM player ORDER BY name ASC'
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(query)
+    players_full = cur.fetchall()
+    cur.close()
+    conn.close()
 
     return players_full
 
@@ -592,44 +590,45 @@ def get_latest_player_ratings(month=None, year=None):
             SELECT 
                 pm.player_id,
                 MAX(pr.player_rating_timestamp) as max_timestamp
-            FROM PlayerMatch pm
-            JOIN PlayerRating pr ON pm.player_match_id = pr.player_match_id
-            WHERE pr.player_rating_timestamp BETWEEN %s AND %s
+            FROM player_match pm
+            JOIN player_rating pr ON pm.id = pr.player_match_id
+            WHERE pr.player_rating_timestamp BETWEEN ? AND ?
             GROUP BY pm.player_id
         ),
         filtered_player_match AS (
             SELECT 
                 pm.player_id,
                 pm.match_id
-            FROM PlayerMatch pm
+            FROM player_match pm
             JOIN max_player_rating_timestamp mprt ON pm.player_id = mprt.player_id
         ),
         filtered_matches AS (
-            SELECT match_id
-            FROM Match
-            WHERE match_timestamp BETWEEN %s AND %s
+            SELECT id
+            FROM match
+            WHERE created_at BETWEEN ? AND ?
         )
         SELECT 
-            CONCAT(p.first_name, '.', SUBSTRING(p.last_name FROM 1 FOR 1)) as player_name, 
+            p.name as player_name, 
             pr.rating, 
             COUNT(DISTINCT fpm.match_id) as num_matches,
             pr.player_rating_timestamp
-        FROM Player p
-        JOIN max_player_rating_timestamp mprt ON p.player_id = mprt.player_id
-        JOIN PlayerMatch pm ON p.player_id = pm.player_id
-        JOIN PlayerRating pr ON pm.player_match_id = pr.player_match_id
+        FROM player p
+        JOIN max_player_rating_timestamp mprt ON p.id = mprt.player_id
+        JOIN player_match pm ON p.id = pm.player_id
+        JOIN player_rating pr ON pm.id = pr.player_match_id
             AND pr.player_rating_timestamp = mprt.max_timestamp
-        JOIN filtered_player_match fpm ON p.player_id = fpm.player_id
-        JOIN filtered_matches fm ON fpm.match_id = fm.match_id
-        GROUP BY p.player_id, pr.rating, pr.player_rating_timestamp
+        JOIN filtered_player_match fpm ON p.id = fpm.player_id
+        JOIN filtered_matches fm ON fpm.match_id = fm.id
+        GROUP BY p.id, pr.rating, pr.player_rating_timestamp
         ORDER BY pr.rating DESC;
     '''
 
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(query, (start_date, end_date, start_date, end_date))
-        player_ratings = cur.fetchall()
-
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(query, (start_date, end_date, start_date, end_date))
+    player_ratings = cur.fetchall()
+    cur.close()
+    conn.close()
 
     return player_ratings
 
@@ -640,31 +639,33 @@ def get_match_list(month=None):
     selected_month = int(month) if month else default_month
     start_date = f'{default_year}-{selected_month:02d}-01 00:00:00'
     end_date = f'{default_year}-{selected_month:02d}-{get_last_day_of_month(selected_month, default_year):02d} 23:59:59'
-    query = f'''
+    query = '''
         SELECT 
-            m.match_id as ID,
-            P1.first_name AS player_1,
-            P2.first_name AS player_2,
+            m.id as ID,
+            P1.name AS player_1,
+            P2.name AS player_2,
             M.winning_team_score AS score_team_1,
-            P3.first_name AS player_3,
-            P4.first_name AS player_4,
+            P3.name AS player_3,
+            P4.name AS player_4,
             M.losing_team_score AS score_team_2,
-            M.match_timestamp
-        FROM Match M
-        JOIN Team WT ON M.winning_team_id = WT.team_id
-        JOIN Team LT ON M.losing_team_id = LT.team_id
-        JOIN Player P1 ON WT.team_player_1_id = P1.player_id
-        JOIN Player P2 ON WT.team_player_2_id = P2.player_id
-        JOIN Player P3 ON LT.team_player_1_id = P3.player_id
-        JOIN Player P4 ON LT.team_player_2_id = P4.player_id
-        WHERE M.match_timestamp >= %s AND M.match_timestamp <= %s
-        ORDER BY M.match_timestamp DESC;
+            M.created_at
+        FROM match M
+        JOIN team WT ON M.winning_team_id = WT.id
+        JOIN team LT ON M.losing_team_id = LT.id
+        JOIN player P1 ON WT.team_player_1_id = P1.id
+        JOIN player P2 ON WT.team_player_2_id = P2.id
+        JOIN player P3 ON LT.team_player_1_id = P3.id
+        JOIN player P4 ON LT.team_player_2_id = P4.id
+        WHERE M.created_at >= ? AND M.created_at <= ?
+        ORDER BY M.created_at DESC;
     '''
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(query, (start_date, end_date))
-        print(start_date,end_date)
-        matches = cur.fetchall()
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(query, (start_date, end_date))
+    print(start_date,end_date)
+    matches = cur.fetchall()
+    cur.close()
+    conn.close()
 
     return matches
 
@@ -716,49 +717,129 @@ def create_game():
     return render_template('create_game.html', players=players)
 
 def get_last_match():
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT m.match_id as matchid,m.match_timestamp as time, p1.first_name AS player1_name, p2.first_name AS player2_name, p3.first_name AS player3_name, p4.first_name AS player4_name, m.winning_team_score AS team1_score, m.losing_team_score AS team2_score FROM Match m INNER JOIN Team wt ON m.winning_team_id = wt.team_id INNER JOIN Team lt ON m.losing_team_id = lt.team_id INNER JOIN Player p1 ON wt.team_player_1_id = p1.player_id INNER JOIN Player p2 ON wt.team_player_2_id = p2.player_id INNER JOIN Player p3 ON lt.team_player_1_id = p3.player_id INNER JOIN Player p4 ON lt.team_player_2_id = p4.player_id ORDER BY m.match_id DESC LIMIT 1;")
-        last_match = cur.fetchone()
-        
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+                SELECT 
+                    m.id as matchid,
+                    m.created_at as time,
+                    p1.name AS player1_name,
+                    p2.name AS player2_name,
+                    p3.name AS player3_name,
+                    p4.name AS player4_name,
+                    m.winning_team_score AS team1_score,
+                    m.losing_team_score AS team2_score
+                FROM match m
+                INNER JOIN team wt ON m.winning_team_id = wt.id
+                INNER JOIN team lt ON m.losing_team_id = lt.id
+                INNER JOIN player p1 ON wt.team_player_1_id = p1.id
+                INNER JOIN player p2 ON wt.team_player_2_id = p2.id
+                INNER JOIN player p3 ON lt.team_player_1_id = p3.id
+                INNER JOIN player p4 ON lt.team_player_2_id = p4.id
+                ORDER BY m.id DESC
+                LIMIT 1;
+                """)
+    last_match = cur.fetchone()
+    dt = datetime.strptime(last_match[1], '%Y-%m-%d %H:%M:%S')
+    last_match =(last_match[0], dt, last_match[2], last_match[3], last_match[4], last_match[5], last_match[6], last_match[7])
+    cur.close()
+    conn.close()
     return last_match
 
 def get_player_ratings_before_after():
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("WITH last_match AS (SELECT m.match_id as match_id, m.match_timestamp as match_time, wt.team_player_1_id AS player1_id, wt.team_player_2_id AS player2_id, lt.team_player_1_id AS player3_id, lt.team_player_2_id AS player4_id FROM Match m INNER JOIN Team wt ON m.winning_team_id = wt.team_id INNER JOIN Team lt ON m.losing_team_id = lt.team_id ORDER BY m.match_id DESC LIMIT 1), player_ratings AS (SELECT pm.player_id, pr.rating, pr.player_rating_timestamp, ROW_NUMBER() OVER (PARTITION BY pm.player_id ORDER BY pr.player_rating_timestamp DESC) AS rn FROM PlayerRating pr INNER JOIN PlayerMatch pm ON pr.player_match_id = pm.player_match_id WHERE pm.player_id IN (SELECT player1_id FROM last_match UNION ALL SELECT player2_id FROM last_match UNION ALL SELECT player3_id FROM last_match UNION ALL SELECT player4_id FROM last_match)) SELECT p.player_id, p.first_name, pr_before.rating AS rating_before, pr_after.rating AS rating_after FROM Player p LEFT JOIN player_ratings pr_before ON p.player_id = pr_before.player_id AND pr_before.rn = 2 LEFT JOIN player_ratings pr_after ON p.player_id = pr_after.player_id AND pr_after.rn = 1 WHERE p.player_id IN (SELECT player1_id FROM last_match UNION ALL SELECT player2_id FROM last_match UNION ALL SELECT player3_id FROM last_match UNION ALL SELECT player4_id FROM last_match) ORDER BY p.player_id;")
-        results = cur.fetchall()
-        
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+    WITH last_match AS (
+        SELECT 
+            m.id as match_id,
+            m.created_at as match_time,
+            wt.team_player_1_id AS player1_id,
+            wt.team_player_2_id AS player2_id,
+            lt.team_player_1_id AS player3_id,
+            lt.team_player_2_id AS player4_id
+        FROM match m 
+            INNER JOIN team wt ON m.winning_team_id = wt.id
+            INNER JOIN team lt ON m.losing_team_id = lt.id
+        ORDER BY m.id DESC LIMIT 1), 
+            player_ratings AS (
+                SELECT pm.player_id,
+                    pr.rating,
+                    pr.player_rating_timestamp,
+                    ROW_NUMBER() OVER (PARTITION BY pm.player_id ORDER BY pr.player_rating_timestamp DESC) AS rn
+                FROM player_rating pr
+                INNER JOIN player_match pm ON pr.player_match_id = pm.id
+            WHERE pm.player_id IN (
+                SELECT 
+                    player1_id
+                FROM last_match 
+                UNION ALL
+                SELECT player2_id
+                FROM
+                last_match
+                UNION ALL
+                SELECT player3_id
+                FROM last_match
+                UNION ALL 
+                SELECT player4_id
+                FROM last_match)) 
+            SELECT 
+                p.id as player_id,
+                p.name,
+                pr_before.rating AS rating_before,
+                pr_after.rating AS rating_after
+            FROM player p 
+                LEFT JOIN player_ratings pr_before
+                ON p.id = pr_before.player_id AND pr_before.rn = 2 
+                LEFT JOIN player_ratings pr_after ON p.id = pr_after.player_id AND pr_after.rn = 1
+                WHERE p.id IN (
+                    SELECT player1_id 
+                    FROM last_match 
+                    UNION ALL 
+                        SELECT player2_id 
+                    FROM last_match 
+                    UNION ALL 
+                    SELECT player3_id 
+                    FROM last_match 
+                    UNION ALL
+                    SELECT player4_id 
+                    FROM last_match) ORDER BY p.id;""")
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
     return results
 
 def delete_last_match():
-    with get_connection() as conn:
-        cur = conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
 
-        # Begin transaction
-        cur.execute("BEGIN;")
+    # Begin transaction
+    cur.execute("BEGIN;")
 
-        # Find the latest match_id
-        cur.execute("SELECT match_id FROM \"match\" ORDER BY match_timestamp DESC LIMIT 1;")
-        latest_match_id = cur.fetchone()[0]
+    # Find the latest match_id
+    cur.execute("SELECT match_id FROM \"match\" ORDER BY created_at DESC LIMIT 1;")
+    latest_match_id = cur.fetchone()[0]
 
-        # Delete related player ratings
-        cur.execute(f"DELETE FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE match_id = {latest_match_id});")
+    # Delete related player ratings
+    cur.execute(f"DELETE FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE match_id = {latest_match_id});")
 
-        # Delete related team ratings
-        cur.execute(f"DELETE FROM teamrating WHERE team_match_id IN (SELECT team_match_id FROM teammatch WHERE match_id = {latest_match_id});")
+    # Delete related team ratings
+    cur.execute(f"DELETE FROM team_rating WHERE team_match_id IN (SELECT team_match_id FROM team_match WHERE match_id = {latest_match_id});")
 
-        # Delete related player matches
-        cur.execute(f"DELETE FROM playermatch WHERE match_id = {latest_match_id};")
+    # Delete related player matches
+    cur.execute(f"DELETE FROM player_match WHERE match_id = {latest_match_id};")
 
-        # Delete related team matches
-        cur.execute(f"DELETE FROM teammatch WHERE match_id = {latest_match_id};")
+    # Delete related team matches
+    cur.execute(f"DELETE FROM team_match WHERE match_id = {latest_match_id};")
 
-        # Delete the match itself
-        cur.execute(f"DELETE FROM \"match\" WHERE match_id = {latest_match_id};")
+    # Delete the match itself
+    cur.execute(f"DELETE FROM \"match\" WHERE match_id = {latest_match_id};")
 
-        # Commit transaction
-        cur.execute("COMMIT;")
+    # Commit transaction
+    cur.execute("COMMIT;")
+
+    cur.close()
+    conn.close()
 
 
 @app.route('/thank_you')
@@ -831,13 +912,13 @@ def players_list_showed():
 @app.route('/add_player', methods=['GET', 'POST'])
 def add_player():
     if request.method == 'POST':
-        first_name = request.form['first_name']
+        name = request.form['name']
         last_name = request.form['last_name']
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT nextval('player_id_seq')")
         id_next_player = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO player (player_id, first_name, last_name) VALUES (%s, %s, %s)", (id_next_player, first_name, last_name))
+        cursor.execute("INSERT INTO player (id, name) VALUES (?, ?)", (id_next_player, name))
         conn.commit()
         cursor.close()
         conn.close()
@@ -849,21 +930,21 @@ def add_player():
 @app.route('/edit_player/<int:player_id>', methods=['GET', 'POST'])
 def edit_player(player_id):
     if request.method == 'POST':
-        first_name = request.form['first_name']
+        name = request.form['name']
         last_name = request.form['last_name']
         active = True if request.form.get('active') else False
 
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE Player SET first_name = %s, last_name = %s, active = %s WHERE player_id = %s",
-                            (first_name, last_name, active, player_id))
+                cur.execute("UPDATE Player SET name = ?, active = ? WHERE id = ?",
+                            (name, active, player_id))
                 conn.commit()
 
         return redirect(url_for('players_list_showed'))
     else:
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT player_id, first_name, last_name, active FROM Player WHERE player_id = %s", (player_id,))
+                cur.execute("SELECT id, name, active FROM Player WHERE id = ?", (player_id,))
                 player = cur.fetchone()
 
         if player:
@@ -876,19 +957,21 @@ def delete_match():
     if request.method == 'POST':
         match_id = request.form['match_id']
 
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    DELETE FROM playerrating WHERE player_match_id IN (
-                        SELECT player_match_id FROM playermatch WHERE match_id = %s);
-                    DELETE FROM teamrating WHERE team_match_id IN (
-                        SELECT team_match_id FROM teammatch WHERE match_id = %s);
-                    DELETE FROM playermatch WHERE match_id = %s;
-                    DELETE FROM teammatch WHERE match_id = %s;
-                    DELETE FROM match WHERE match_id = %s;
-                """, (match_id, match_id, match_id, match_id, match_id))
-                conn.commit()
-
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            DELETE FROM player_rating WHERE player_match_id IN (
+                SELECT player_match_id FROM player_match WHERE match_id = ?);
+            DELETE FROM team_rating WHERE team_match_id IN (
+                SELECT team_match_id FROM team_match WHERE match_id = ?);
+            DELETE FROM player_match WHERE match_id = ?;
+            DELETE FROM team_match WHERE match_id = ?;
+            DELETE FROM match WHERE id = ?;
+        """, (match_id, match_id, match_id, match_id, match_id))
+        conn.commit()
+        cur.close()
+        conn.close()
         return redirect(url_for('add_player'))
     else:
         return render_template('delete_match.html')
@@ -909,7 +992,7 @@ def get_player_id_metrics(player_name):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT player_id FROM player WHERE first_name=%s", (player_name,))
+    cur.execute("SELECT id FROM player WHERE name=?", (player_name,))
     player_id = cur.fetchone()[0]
 
     cur.close()
@@ -929,27 +1012,27 @@ def player_stats_route():
         cur = conn.cursor()
 
         # Total number of games played by the player
-        cur.execute("SELECT COUNT(PlayerMatch.player_id) AS total_games \
-                     FROM PlayerMatch \
-                     WHERE PlayerMatch.player_id = %s", (player_id,))
+        cur.execute("SELECT COUNT(player_match.player_id) AS total_games \
+                     FROM player_match \
+                     WHERE player_match.player_id = ?", (player_id,))
         total_games = cur.fetchone()[0]
 
         # Total number of games won by the player
-        cur.execute("SELECT COUNT(CASE WHEN Match.winning_team_id = t.team_id THEN 1 END) AS total_wins \
-                     FROM PlayerMatch pm \
-                     JOIN Match ON Match.match_id = pm.match_id \
-                     JOIN Team t ON (t.team_player_1_id = pm.player_id OR t.team_player_2_id = pm.player_id) \
-                     WHERE pm.player_id = %s \
-                     AND (Match.winning_team_id = t.team_id OR Match.losing_team_id = t.team_id)", (player_id,))
+        cur.execute("SELECT COUNT(CASE WHEN match.winning_team_id = t.id THEN 1 END) AS total_wins \
+                     FROM player_match pm \
+                     JOIN match ON match.id = pm.match_id \
+                     JOIN team t ON (t.team_player_1_id = pm.player_id OR t.team_player_2_id = pm.player_id) \
+                     WHERE pm.player_id = ? \
+                     AND (match.winning_team_id = t.id OR match.losing_team_id = t.id)", (player_id,))
         total_wins = cur.fetchone()[0]
 
         # Total number of games lost by the player
-        cur.execute("SELECT COUNT(CASE WHEN Match.losing_team_id = t.team_id THEN 1 END) AS total_losses \
-                     FROM PlayerMatch pm \
-                     JOIN Match ON Match.match_id = pm.match_id \
-                     JOIN Team t ON (t.team_player_1_id = pm.player_id OR t.team_player_2_id = pm.player_id) \
-                     WHERE pm.player_id = %s \
-                     AND (Match.winning_team_id = t.team_id OR Match.losing_team_id = t.team_id)", (player_id,))
+        cur.execute("SELECT COUNT(CASE WHEN match.losing_team_id = t.id THEN 1 END) AS total_losses \
+                     FROM player_match pm \
+                     JOIN match ON match.id = pm.match_id \
+                     JOIN team t ON (t.team_player_1_id = pm.player_id OR t.team_player_2_id = pm.player_id) \
+                     WHERE pm.player_id = ? \
+                     AND (match.winning_team_id = t.id OR match.losing_team_id = t.id)", (player_id,))
         total_losses = cur.fetchone()[0]
 
          # Average score per game by the player
@@ -957,44 +1040,44 @@ def player_stats_route():
                        WHEN t.team_player_1_id = pm.player_id THEN m.winning_team_score \
                        ELSE m.losing_team_score \
                      END) AS avg_score \
-                     FROM PlayerMatch pm \
-                     JOIN Match m ON m.match_id = pm.match_id \
-                     JOIN Team t ON t.team_id = m.winning_team_id OR t.team_id = m.losing_team_id \
-                     WHERE pm.player_id = %s", (player_id,))
+                     FROM player_match pm \
+                     JOIN match m ON m.id = pm.match_id \
+                     JOIN team t ON t.id = m.winning_team_id OR t.id = m.losing_team_id \
+                     WHERE pm.player_id = ?", (player_id,))
         avg_score = cur.fetchone()[0]
 
         # Name of the player played with the most on the same team 
-        cur.execute("""SELECT p2.first_name, p2.last_name, COUNT(DISTINCT tm2.match_id) AS games_played,
+        cur.execute("""SELECT p2.name, COUNT(DISTINCT tm2.match_id) AS games_played,
        COUNT(DISTINCT CASE WHEN m.winning_team_id = tm2.team_id THEN tm2.match_id END) AS games_won,
        COUNT(DISTINCT CASE WHEN m.losing_team_id = tm2.team_id THEN tm2.match_id END) AS games_lost,
        COUNT(DISTINCT CASE WHEN m.winning_team_id = tm2.team_id THEN tm2.match_id END) * 100.0 / COUNT(DISTINCT tm2.match_id) AS win_rate
-        FROM Player p1
-        JOIN PlayerMatch pm1 ON p1.player_id = pm1.player_id
-        JOIN Match m ON pm1.match_id = m.match_id
-        JOIN TeamMatch tm1 ON tm1.match_id = m.match_id AND (tm1.team_id = m.winning_team_id OR tm1.team_id = m.losing_team_id)
-        JOIN Team t1 ON t1.team_id = tm1.team_id AND (t1.team_player_1_id = p1.player_id OR t1.team_player_2_id = p1.player_id)
-        JOIN TeamMatch tm2 ON tm2.match_id = tm1.match_id AND tm2.team_id = t1.team_id
-        JOIN PlayerMatch pm2 ON pm2.match_id = tm2.match_id AND pm2.player_id != p1.player_id AND (t1.team_player_1_id = pm2.player_id OR t1.team_player_2_id = pm2.player_id)
-        JOIN Player p2 ON p2.player_id = pm2.player_id AND p2.player_id != p1.player_id AND p2.first_name != 'Guest'
-        WHERE p1.player_id = %s
-        GROUP BY p2.player_id, p2.first_name, p2.last_name
+        FROM player p1
+        JOIN player_match pm1 ON p1.id = pm1.player_id
+        JOIN match m ON pm1.match_id = m.id
+        JOIN team_match tm1 ON tm1.match_id = m.id AND (tm1.team_id = m.winning_team_id OR tm1.team_id = m.losing_team_id)
+        JOIN team t1 ON t1.id = tm1.team_id AND (t1.player_1_id = p1.id OR t1.player_2_id = p1.id)
+        JOIN team_match tm2 ON tm2.match_id = tm1.match_id AND tm2.team_id = t1.id
+        JOIN player_match pm2 ON pm2.match_id = tm2.match_id AND pm2.player_id != p1.id AND (t1.team_player_1_id = pm2.player_id OR t1.team_player_2_id = pm2.player_id)
+        JOIN player p2 ON p2.id = pm2.player_id AND p2.id != p1.id AND p2.name != 'Guest'
+        WHERE p1.id = ?
+        GROUP BY p2.id, p2.name
         ORDER BY games_played DESC""", (player_id,))
         player_most_played_with = cur.fetchone()
 
         # Name of the player played with the ranked by win_rate
-        cur.execute("""SELECT p2.first_name, p2.last_name, COUNT(DISTINCT pm2.match_id) AS games_played,
+        cur.execute("""SELECT p2.name, COUNT(DISTINCT pm2.match_id) AS games_played,
                 COUNT(DISTINCT CASE WHEN m.winning_team_id = t.team_id THEN pm2.match_id END) AS games_won,
                 COUNT(DISTINCT CASE WHEN m.losing_team_id = t.team_id THEN pm2.match_id END) AS games_lost,
                 COUNT(DISTINCT CASE WHEN m.winning_team_id = t.team_id THEN pm2.match_id END) * 100.0 / COUNT(DISTINCT pm2.match_id) AS win_rate
-                FROM Player p1
-                JOIN PlayerMatch pm1 ON p1.player_id = pm1.player_id
-                JOIN Match m ON pm1.match_id = m.match_id
-                JOIN Team t ON t.team_id = m.winning_team_id OR t.team_id = m.losing_team_id
-                JOIN Team t2 ON t2.team_id = t.team_id AND (t2.team_player_1_id = p1.player_id OR t2.team_player_2_id = p1.player_id)
-                JOIN PlayerMatch pm2 ON pm2.match_id = pm1.match_id AND (t2.team_player_1_id = pm2.player_id OR t2.team_player_2_id = pm2.player_id) AND pm2.player_id != p1.player_id
-                JOIN Player p2 ON p2.player_id = pm2.player_id AND p2.player_id != p1.player_id
-                WHERE p1.player_id = %s AND (t.team_player_1_id = %s OR t.team_player_2_id = %s) AND p2.first_name != 'Guest'
-                GROUP BY p2.player_id, p2.first_name, p2.last_name
+                FROM player p1
+                JOIN player_match pm1 ON p1.id = pm1.player_id
+                JOIN match m ON pm1.match_id = m.id
+                JOIN team t ON t.id = m.winning_team_id OR t.id = m.losing_team_id
+                JOIN team t2 ON t2.id = t.id AND (t2.player_1_id = p1.id OR t2.player_2_id = p1.id)
+                JOIN player_match pm2 ON pm2.match_id = pm1.match_id AND (t2.player_1_id = pm2.player_id OR t2.player_2_id = pm2.player_id) AND pm2.player_id != p1.id
+                JOIN player p2 ON p2.id = pm2.player_id AND p2.id != p1.id
+                WHERE p1.id = ? AND (t.id = ? OR t.id = ?) AND p2.name != 'Guest'
+                GROUP BY p2.id, p2.name
                 ORDER BY win_rate DESC""", (player_id, player_id, player_id))
         player_most_played_with_win_rate = cur.fetchall()
 
@@ -1002,34 +1085,34 @@ def player_stats_route():
          # Name of the player played against the most 
         cur.execute("""WITH match_stats AS (
                 SELECT
-                    p.player_id,
-                    SUM(CASE WHEN t1.team_id = m.winning_team_id AND t2.team_id = m.losing_team_id THEN 1 ELSE 0 END) AS games_lost,
-                    SUM(CASE WHEN t1.team_id = m.losing_team_id AND t2.team_id = m.winning_team_id THEN 1 ELSE 0 END) AS games_won
+                    p.id AS player_id,
+                    SUM(CASE WHEN t1.id = m.winning_team_id AND t2.id = m.losing_team_id THEN 1 ELSE 0 END) AS games_lost,
+                    SUM(CASE WHEN t1.id = m.losing_team_id AND t2.id = m.winning_team_id THEN 1 ELSE 0 END) AS games_won
                 FROM
-                    Player p
+                    player p
                 JOIN
-                    Team t1 ON p.player_id = t1.team_player_1_id OR p.player_id = t1.team_player_2_id
+                    team t1 ON p.id = t1.player_1_id OR p.id = t1.player_2_id
                 JOIN
-                    Team t2 ON (t2.team_player_1_id = %s OR t2.team_player_2_id = %s) AND t1.team_id != t2.team_id
+                    team t2 ON (t2.player_1_id = ? OR t2.player_2_id = ?) AND t1.id != t2.id
                 JOIN
-                    Match m ON (t1.team_id = m.winning_team_id AND t2.team_id = m.losing_team_id) OR (t1.team_id = m.losing_team_id AND t2.team_id = m.winning_team_id)
+                    match m ON (t1.id = m.winning_team_id AND t2.id = m.losing_team_id) OR (t1.id = m.losing_team_id AND t2.id = m.winning_team_id)
                 WHERE
-                    p.player_id != %s
-                GROUP BY p.player_id
+                    p.id != ?
+                GROUP BY p.id
             )
             SELECT
-                p.first_name,
+                p.name,
                 p.last_name,
                 ms.games_won,
                 ms.games_lost,
                 ms.games_won + ms.games_lost AS total_games,
                 ROUND(ms.games_won * 100.0 / (ms.games_won + ms.games_lost), 2) AS win_rate
             FROM
-                Player p
+                player p
             JOIN
-                match_stats ms ON p.player_id = ms.player_id
+                match_stats ms ON p.id = ms.player_id
             WHERE
-                p.player_id != %s AND p.first_name != 'Guest'
+                p.id != ? AND p.name != 'Guest'
             ORDER BY
             total_games DESC""", (player_id,player_id,player_id,player_id))
         player_most_played_against = cur.fetchone()
@@ -1037,34 +1120,34 @@ def player_stats_route():
         # Name of the player played against the most with win rate
         cur.execute("""WITH match_stats AS (
                 SELECT
-                    p.player_id,
-                    SUM(CASE WHEN t1.team_id = m.winning_team_id AND t2.team_id = m.losing_team_id THEN 1 ELSE 0 END) AS games_lost,
-                    SUM(CASE WHEN t1.team_id = m.losing_team_id AND t2.team_id = m.winning_team_id THEN 1 ELSE 0 END) AS games_won
+                    p.id AS player_id,
+                    SUM(CASE WHEN t1.id = m.winning_team_id AND t2.id = m.losing_team_id THEN 1 ELSE 0 END) AS games_lost,
+                    SUM(CASE WHEN t1.id = m.losing_team_id AND t2.id = m.winning_team_id THEN 1 ELSE 0 END) AS games_won
                 FROM
-                    Player p
+                    player p
                 JOIN
-                    Team t1 ON p.player_id = t1.team_player_1_id OR p.player_id = t1.team_player_2_id
+                    team t1 ON p.id = t1.player_1_id OR p.id = t1.player_2_id
                 JOIN
-                    Team t2 ON (t2.team_player_1_id = %s OR t2.team_player_2_id = %s) AND t1.team_id != t2.team_id
+                    team t2 ON (t2.player_1_id = ? OR t2.player_2_id = ?) AND t1.id != t2.id
                 JOIN
-                    Match m ON (t1.team_id = m.winning_team_id AND t2.team_id = m.losing_team_id) OR (t1.team_id = m.losing_team_id AND t2.team_id = m.winning_team_id)
+                    match m ON (t1.id = m.winning_team_id AND t2.id = m.losing_team_id) OR (t1.id = m.losing_team_id AND t2.id = m.winning_team_id)
                 WHERE
-                    p.player_id != %s
-                GROUP BY p.player_id
+                    p.id != ?
+                GROUP BY p.id
             )
             SELECT
-                p.first_name,
+                p.name,
                 p.last_name,
                 ms.games_won,
                 ms.games_lost,
                 ms.games_won + ms.games_lost AS total_games,
                 ROUND(ms.games_won * 100.0 / (ms.games_won + ms.games_lost), 2) AS win_rate
             FROM
-                Player p
+                player p
             JOIN
-                match_stats ms ON p.player_id = ms.player_id
+                match_stats ms ON p.id = ms.player_id
             WHERE
-                p.player_id != %s AND p.first_name != 'Guest'
+                p.id != ? AND p.name != 'Guest'
             ORDER BY
             win_rate DESC""", (player_id,player_id,player_id,player_id))
         player_most_played_against_win_rate = cur.fetchall()
@@ -1093,11 +1176,6 @@ dash_app = dash.Dash(__name__, server=app, external_stylesheets=[dbc.themes.BOOT
 
 fontFormat = dict(family="Segoe UI, Roboto, Helvetica Neue, Helvetica, Microsoft YaHei, Meiryo, Meiryo UI, Arial Unicode MS, sans-serif",
                   size=18,)
-
-engine = create_engine(
-    f"postgresql://{config.user}:{config.password}@"
-    f"{config.host}/{config.database}"
-)
 
 dash_app.layout = dbc.Container([
     html.H1('Rating Evolution'),
@@ -1149,7 +1227,7 @@ dash_app.layout = dbc.Container([
                                        className='action action2'),
                                 html.A('Ranking', href='/rating',
                                        className='action action3'),
-                                html.A('Match history', href='/match_list',
+                                html.A('match history', href='/match_list',
                                        className='action action4'),
                                 # Add two more options
                                 html.A('Rating evolution', href='/rating_evolution',
@@ -1178,15 +1256,15 @@ def update_rating_graph(players):
     fig = go.Figure()
     for player in players:
         query = f"""SELECT
-        DISTINCT ON (DATE_TRUNC('day', m.match_timestamp))
-        DATE_TRUNC('day', m.match_timestamp) AS day_start,
-            CASE WHEN p.first_name = '{player}' THEN pr.rating ELSE NULL END AS rating
-        FROM PlayerMatch pm
-        JOIN Player p ON pm.player_id = p.player_id
-        JOIN PlayerRating pr ON pm.player_match_id = pr.player_match_id
-        JOIN Match m ON pm.match_id = m.match_id
-        WHERE p.first_name = '{player}'
-        ORDER BY DATE_TRUNC('day', m.match_timestamp) DESC, m.match_timestamp DESC
+        DISTINCT ON (DATE_TRUNC('day', m.created_at))
+        DATE_TRUNC('day', m.created_at) AS day_start,
+            CASE WHEN p.name = '{player}' THEN pr.rating ELSE NULL END AS rating
+        FROM player_match pm
+        JOIN player p ON pm.player_id = p.id
+        JOIN player_rating pr ON pm.player_match_id = pr.id
+        JOIN match m ON pm.match_id = m.id
+        WHERE p.name = '{player}'
+        ORDER BY DATE_TRUNC('day', m.created_at) DESC, m.created_at DESC
                         """
 
         data = pd.read_sql(query, engine)
@@ -1250,3 +1328,4 @@ def update_rating_graph(players):
 if __name__ == '__main__':
     app.static_folder = 'static'
     app.run(host='0.0.0.0', port=8082, debug=True)
+    _tempdir.__exit__(None, None, None)

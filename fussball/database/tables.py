@@ -17,17 +17,17 @@ class Player(Base):
 class Team(Base):
     __tablename__ = "team"
 
-    team_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     team_player_1_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
     team_player_2_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
 
 class Match(Base):
     __tablename__ = "match"
 
-    match_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     created_at = Column(DateTime, nullable=False)
-    winning_team_id = Column(UUID(as_uuid=True), ForeignKey("team.team_id"), nullable=False)
-    losing_team_id = Column(UUID(as_uuid=True), ForeignKey("team.team_id"), nullable=False)
+    winning_team_id = Column(UUID(as_uuid=True), ForeignKey("team.id"), nullable=False)
+    losing_team_id = Column(UUID(as_uuid=True), ForeignKey("team.id"), nullable=False)
     winning_team_score = Column(Integer, nullable=False)
     losing_team_score = Column(Integer, nullable=False)
     __table_args__ = (
@@ -40,7 +40,7 @@ class PlayerMatch(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     player_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
-    match_id = Column(UUID(as_uuid=True), ForeignKey("match.match_id"), nullable=False)
+    match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
 
 class PlayerRating(Base):
     __tablename__ = "player_rating"
@@ -54,13 +54,13 @@ class TeamMatch(Base):
     __tablename__ = "team_match"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    team_id = Column(UUID(as_uuid=True), ForeignKey("team.team_id"), nullable=False)
-    match_id = Column(UUID(as_uuid=True), ForeignKey("match.match_id"), nullable=False)
+    team_id = Column(UUID(as_uuid=True), ForeignKey("team.id"), nullable=False)
+    match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
 
 class TeamRating(Base):
     __tablename__ = "team_rating"
 
-    team_rating_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     team_match_id = Column(UUID(as_uuid=True), ForeignKey("team_match.id"), nullable=False)
     rating = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False)
