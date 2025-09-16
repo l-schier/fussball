@@ -48,7 +48,7 @@ class PlayerRating(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     player_match_id = Column(UUID(as_uuid=True), ForeignKey("player_match.id"), nullable=False)
     rating = Column(Integer, nullable=False)
-    player_rating_timestamp = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False)
 
 class TeamMatch(Base):
     __tablename__ = "team_match"

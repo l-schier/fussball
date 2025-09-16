@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import math
 
-class MatchResult(BaseModel):
+class matchResult(BaseModel):
     player1_name: str
     player2_name: str
     team1_score: int
@@ -29,31 +29,31 @@ def calculate_point_factor(score_difference):
     return 2 + (math.log(score_difference + 1) / math.log(10)) ** 3
 
 def get_team_match_id_by_timestamp_and_by_team_id(team1_id: int,team2_id: int, date: datetime, conn: Session) -> tuple[int, int]:
-    result = conn.execute(text("SELECT TeamMatch.team_match_id FROM Match JOIN TeamMatch ON Match.match_id = TeamMatch.match_id WHERE TeamMatch.team_id = :team1_id AND Match.match_timestamp = :date;", {"team1_id": team1_id, "date": date}))
+    result = conn.execute(text("SELECT team_match.team_match_id FROM match JOIN team_match ON match.match_id = team_match.match_id WHERE team_match.team_id = :team1_id AND match.match_timestamp = :date;", {"team1_id": team1_id, "date": date}))
     team_match1_id = result.fetchone()[0]
 
-    result = conn.execute(text("SELECT TeamMatch.team_match_id FROM Match JOIN TeamMatch ON Match.match_id = TeamMatch.match_id WHERE TeamMatch.team_id = :team2_id AND Match.match_timestamp = :date;", {"team2_id": team2_id, "date": date}))
+    result = conn.execute(text("SELECT team_match.team_match_id FROM match JOIN team_match ON match.match_id = team_match.match_id WHERE team_match.team_id = :team2_id AND match.match_timestamp = :date;", {"team2_id": team2_id, "date": date}))
     team_match2_id = result.fetchone()[0]
 
     return (team_match1_id,team_match2_id)
 
 def get_player_match_id_by_timestamp_and_by_player_id(players: Players, date, conn: Session) -> tuple[int, int, int, int]:
-    res = conn.execute(text("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = :player1_id AND Match.match_timestamp = :date;", {"player1_id": players.player1_id, "date": date}))
+    res = conn.execute(text("SELECT player_match.player_match_id FROM match JOIN player_match ON match.match_id = player_match.match_id WHERE player_match.player_id = :player1_id AND match.match_timestamp = :date;", {"player1_id": players.player1_id, "date": date}))
     player1_match_id = res.fetchone()[0]
 
-    res = conn.execute(text("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = :player2_id AND Match.match_timestamp = :date;", {"player2_id": players.player2_id, "date": date}))
+    res = conn.execute(text("SELECT player_match.player_match_id FROM match JOIN player_match ON match.match_id = player_match.match_id WHERE player_match.player_id = :player2_id AND match.match_timestamp = :date;", {"player2_id": players.player2_id, "date": date}))
     player2_match_id = res.fetchone()[0]
 
-    res = conn.execute(text("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = :player3_id AND Match.match_timestamp = :date;", {"player3_id": players.player3_id, "date": date}))
+    res = conn.execute(text("SELECT player_match.player_match_id FROM match JOIN player_match ON match.match_id = player_match.match_id WHERE player_match.player_id = :player3_id AND match.match_timestamp = :date;", {"player3_id": players.player3_id, "date": date}))
     player3_match_id = res.fetchone()[0]
 
-    res = conn.execute(text("SELECT PlayerMatch.player_match_id FROM Match JOIN PlayerMatch ON Match.match_id = PlayerMatch.match_id WHERE PlayerMatch.player_id = :player4_id AND Match.match_timestamp = :date;", {"player4_id": players.player4_id, "date": date}))
+    res = conn.execute(text("SELECT player_match.player_match_id FROM match JOIN player_match ON match.match_id = player_match.match_id WHERE player_match.player_id = :player4_id AND match.match_timestamp = :date;", {"player4_id": players.player4_id, "date": date}))
     player4_match_id = res.fetchone()[0]
 
     return (player1_match_id, player2_match_id, player3_match_id, player4_match_id)
 
 def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, int]:
-    conn.execute(text("SELECT rating, team_rating_timestamp FROM teamrating WHERE team_match_id IN (SELECT team_match_id FROM teammatch WHERE team_id = :team1_id) ORDER BY team_rating_timestamp DESC LIMIT 1;", {"team1_id": team1_id}))
+    conn.execute(text("SELECT rating, created_at FROM team_rating WHERE team_match_id IN (SELECT team_match_id FROM team_match WHERE team_id = :team1_id) ORDER BY created_at DESC LIMIT 1;", {"team1_id": team1_id}))
     result = conn.fetchone()
 
     if result is not None:
@@ -61,7 +61,7 @@ def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, 
     else:
      team1_rating = 1500
 
-    conn.execute(text("SELECT rating, team_rating_timestamp FROM teamrating WHERE team_match_id IN (SELECT team_match_id FROM teammatch WHERE team_id = :team2_id) ORDER BY team_rating_timestamp DESC LIMIT 1;", {"team2_id": team2_id}))
+    conn.execute(text("SELECT rating, created_at FROM team_rating WHERE team_match_id IN (SELECT team_match_id FROM team_match WHERE team_id = :team2_id) ORDER BY created_at DESC LIMIT 1;", {"team2_id": team2_id}))
     result = conn.fetchone()
     if result is not None:
         team2_rating = result[0]
@@ -72,7 +72,7 @@ def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, 
 
 
 def get_player_rating_by_id(player_id: int, conn: Session) -> int:
-    res = conn.execute(text("SELECT rating FROM playerrating WHERE player_match_id IN (SELECT player_match_id FROM playermatch WHERE player_id =:player_id) ORDER BY player_rating_timestamp DESC LIMIT 1"), {"player_id": player_id})
+    res = conn.execute(text("SELECT rating FROM player_rating WHERE player_match_id IN (SELECT player_match_id FROM player_match WHERE player_id =:player_id) ORDER BY created_at DESC LIMIT 1"), {"player_id": player_id})
     rating = res.fetchone()
     if rating is None:
         return 1500
@@ -88,17 +88,17 @@ def get_player_ratings(players: Players, conn: Session) -> tuple[int, int, int, 
     return player1_rating, player2_rating, player3_rating, player4_rating
 
 def number_of_games_team(team1_id: int, team2_id: int ,date, conn: Session) -> tuple[int, int]:
-    res = conn.execute("SELECT COUNT(*) FROM Match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team1_id,team1_id,date))
+    res = conn.execute("SELECT COUNT(*) FROM match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team1_id,team1_id,date))
     number_of_game_team_1 = res.fetchone()[0] or 0
 
-    res = conn.execute("SELECT COUNT(*) FROM Match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team2_id,team2_id,date))
+    res = conn.execute("SELECT COUNT(*) FROM match WHERE (winning_team_id =%s OR losing_team_id = %s ) AND match_timestamp <=%s", (team2_id,team2_id,date))
     number_of_game_team_2 = res.fetchone()[0] or 0
 
      # Return the number of games played by each team as a tuple
     return (number_of_game_team_1, number_of_game_team_2)
 
 def get_number_of_games_by_player(player_id: int, date, conn: Session) -> int:
-    res = conn.execute(text("SELECT COUNT(*) FROM PlayerMatch pm  INNER JOIN Match m ON pm.match_id = m.match_id  WHERE pm.player_id =:player_id AND m.match_timestamp <=:date"), {"player_id": player_id, "date": date})
+    res = conn.execute(text("SELECT COUNT(*) FROM player_match pm  INNER JOIN match m ON pm.match_id = m.match_id  WHERE pm.player_id =:player_id AND m.match_timestamp <=:date"), {"player_id": player_id, "date": date})
     number_of_game_player = res.fetchone()[0] or 0
     return number_of_game_player
 
@@ -139,7 +139,7 @@ def get_player_id_by_name(player_name: str, conn: Session) -> int:
     return player_id[0]
 
 # Get the player ID of the players playing a match
-def get_player_id(match_result: MatchResult, conn: Session) -> Players:
+def get_player_id(match_result: matchResult, conn: Session) -> Players:
     player1_id = get_player_id_by_name(match_result.player1_name, conn)
     player2_id = get_player_id_by_name(match_result.player2_name, conn)
     player3_id = get_player_id_by_name(match_result.player3_name, conn)
@@ -161,7 +161,7 @@ def check_and_get_team_from_names(players: Players, conn: Session) -> tuple[int,
         team_player_1_id = team_player_1_id[0]
     return team_player_1_id
 
-def process_game_data(match_result: MatchResult, conn: Session):
+def process_game_data(match_result: matchResult, conn: Session):
     # Connect to the database
 
     print("date is", match_result.date)
@@ -210,15 +210,15 @@ def process_game_data(match_result: MatchResult, conn: Session):
         result = conn.execute(text("SELECT match_id FROM match ORDER BY match_id DESC LIMIT 1"))
         match_id = result.fetchone()[0]
 
-        # Insert the players into the PlayerMatch table
-        conn.execute(text("INSERT INTO PlayerMatch (player_id,match_id) VALUES (:player1_id, :match_id)"), {"player1_id": players.player1_id, "match_id": match_id})
-        conn.execute(text("INSERT INTO PlayerMatch (player_id,match_id) VALUES (:player2_id, :match_id)"), {"player2_id": players.player2_id, "match_id": match_id})
-        conn.execute(text("INSERT INTO PlayerMatch (player_id,match_id) VALUES (:player3_id, :match_id)"), {"player3_id": players.player3_id, "match_id": match_id})
-        conn.execute(text("INSERT INTO PlayerMatch (player_id,match_id) VALUES (:player4_id, :match_id)"), {"player4_id": players.player4_id, "match_id": match_id})
+        # Insert the players into the player_match table
+        conn.execute(text("INSERT INTO player_match (player_id,match_id) VALUES (:player1_id, :match_id)"), {"player1_id": players.player1_id, "match_id": match_id})
+        conn.execute(text("INSERT INTO player_match (player_id,match_id) VALUES (:player2_id, :match_id)"), {"player2_id": players.player2_id, "match_id": match_id})
+        conn.execute(text("INSERT INTO player_match (player_id,match_id) VALUES (:player3_id, :match_id)"), {"player3_id": players.player3_id, "match_id": match_id})
+        conn.execute(text("INSERT INTO player_match (player_id,match_id) VALUES (:player4_id, :match_id)"), {"player4_id": players.player4_id, "match_id": match_id})
 
-        # Insert the team into the TeamMatch table
-        conn.execute(text("INSERT INTO TeamMatch (team_id,match_id) VALUES (:team_id, :match_id)"), {"team_id": winning_team_id, "match_id": match_id})
-        conn.execute(text("INSERT INTO TeamMatch (team_id,match_id) VALUES (:team_id, :match_id)"), {"team_id": losing_team_id, "match_id": match_id})
+        # Insert the team into the team_match table
+        conn.execute(text("INSERT INTO team_match (team_id,match_id) VALUES (:team_id, :match_id)"), {"team_id": winning_team_id, "match_id": match_id})
+        conn.execute(text("INSERT INTO team_match (team_id,match_id) VALUES (:team_id, :match_id)"), {"team_id": losing_team_id, "match_id": match_id})
 
     else:
         print(f'Skipping match: {match_result} the match already exist')
@@ -319,21 +319,21 @@ def process_game_data(match_result: MatchResult, conn: Session):
 
     # Update the database with the player ratings
     print("Inserting player rating for player 1 with match ID", player_match1_id, "and new rating", player1_new_rating)
-    conn.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match1_id, player1_new_rating, match_result.date))
+    conn.execute("INSERT INTO player_rating (player_match_id, rating, created_at) VALUES (%s, %s, %s)", (player_match1_id, player1_new_rating, match_result.date))
 
     print("Inserting player rating for player 2 with match ID", player_match2_id, "and new rating", player2_new_rating)
-    conn.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES ( %s, %s, %s)", (player_match2_id, player2_new_rating, match_result.date))
+    conn.execute("INSERT INTO player_rating (player_match_id, rating, created_at) VALUES ( %s, %s, %s)", (player_match2_id, player2_new_rating, match_result.date))
 
     print("Inserting player rating for player 3 with match ID", player_match3_id, "and new rating", player3_new_rating)
-    conn.execute("INSERT INTO playerrating (player_match_id,rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match3_id,player3_new_rating, match_result.date))
+    conn.execute("INSERT INTO player_rating (player_match_id,rating, created_at) VALUES (%s, %s, %s)", (player_match3_id,player3_new_rating, match_result.date))
 
     print("Inserting player rating for player 4 with match ID", player_match4_id, "and new rating", player4_new_rating)
-    conn.execute("INSERT INTO playerrating (player_match_id, rating, player_rating_timestamp) VALUES (%s, %s, %s)", (player_match4_id, player4_new_rating, match_result.date))
+    conn.execute("INSERT INTO player_rating (player_match_id, rating, created_at) VALUES (%s, %s, %s)", (player_match4_id, player4_new_rating, match_result.date))
 
     conn.commit()
 
     # Update the database with the team ratings
-    conn.execute("INSERT INTO teamrating (team_match_id, rating, team_rating_timestamp) VALUES (%s, %s, %s)", (team_match1_id, team1_new_rating, match_result.date))
-    conn.execute("INSERT INTO teamrating (team_match_id, rating, team_rating_timestamp) VALUES (%s, %s, %s)", (team_match2_id, team2_new_rating, match_result.date))
+    conn.execute("INSERT INTO team_rating (team_match_id, rating, created_at) VALUES (%s, %s, %s)", (team_match1_id, team1_new_rating, match_result.date))
+    conn.execute("INSERT INTO team_rating (team_match_id, rating, created_at) VALUES (%s, %s, %s)", (team_match2_id, team2_new_rating, match_result.date))
 
     conn.commit()
