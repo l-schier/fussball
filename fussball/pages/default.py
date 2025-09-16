@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 from uiwiz import ui, PageRouter
 from fussball.database.setup import Connection
 from sqlalchemy import text
