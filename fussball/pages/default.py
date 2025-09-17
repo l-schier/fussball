@@ -2,28 +2,18 @@ from datetime import datetime
 from uiwiz import ui, PageRouter
 from fussball.database.setup import Connection
 from sqlalchemy import text
-from pydantic import BaseModel, Field
+from fussball.elo.upload_match import UploadMatch
 from sqlalchemy import select
 
 from fussball.database.tables import Player
+from fussball.elo.elo_calculator import process_game_data
 
 default_route = PageRouter()
 
-class UploadMatch(BaseModel):
-    player_1: str
-    player_2: str
-    score_team_1: int = Field(ge=0, lt=11)
-    
-    player_3: str
-    player_4: str
-    score_team_2: int = Field(ge=0, lt=11)
-
-    date: datetime
 
 
-
-def get_players(con: Connection):
-    players = con.scalars(select(Player).filter(Player.active)).all()
+async def get_players(con: Connection):
+    players = (await con.execute(select(Player).filter(Player.active))).scalars().all()
     return [ui.dropdownItem(name=row.name, value=row.id) for row in players]
 
 def form_setup(player_options: list[ui.dropdownItem]):
@@ -51,17 +41,19 @@ def form_setup(player_options: list[ui.dropdownItem]):
 @default_route.ui("/match/submit")
 async def submit_match(data: UploadMatch, con: Connection):
     print(data)
-    form_setup(get_players(con))
+    player_options = await get_players(con)
+    form_setup(player_options)
     ui.toast("Match submitted!").success()
+    await process_game_data(data, con)
 
 @default_route.page("/")
 async def default_page(con: Connection):
     ui.element("h1", "Welcome to the Fussball App")
-    res = con.execute(text("SELECT 1+1 AS result"))
+    res = await con.execute(text("SELECT 1+1 AS result"))
     ui.element("p", "Dynamic value from DB:")
-    ui.element("pre", res.fetchall())
+    ui.element("pre", f"1 + 1 = {res.scalar_one()}")
 
-    player_options = get_players(con)
+    player_options = await get_players(con)
     form_setup(player_options)
 
 def draw_player_dropdown(player_name: str, options: list[ui.dropdownItem]):

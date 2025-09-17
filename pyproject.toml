@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.21.0",
     "dash==2.8.1",
     "dash-bootstrap-components==1.4.1",
     "dash-core-components==2.0.0",
