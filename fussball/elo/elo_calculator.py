@@ -88,18 +88,40 @@ async def number_of_games_player(match_result: UploadMatch, date, conn: AsyncSes
     return GamesPlayed(player1_games=player1_games, player2_games=player2_games, player3_games=player3_games, player4_games=player4_games)
 
 
+
 async def get_or_create_team(player_1: str, player_2: str, conn: AsyncSession) -> Team:
     # Try to find the team using SQLAlchemy ORM
     team: Team = (await conn.execute(select(Team).filter(
-        ((Team.team_player_1_id == uuid.UUID(player_1)) & (Team.team_player_2_id == uuid.UUID(player_2))) |
-        ((Team.team_player_1_id == uuid.UUID(player_2)) & (Team.team_player_2_id == uuid.UUID(player_1)))
+        ((Team.team_player_1_id == player_1) & (Team.team_player_2_id == player_2)) |
+        ((Team.team_player_1_id == player_2) & (Team.team_player_2_id == player_1))
     ))).scalars().first()
     if team is None:
-        new_team = Team(team_player_1_id=player_1, team_player_2_id=player_2)
+        new_team = Team(id=uuid.uuid4(), team_player_1_id=player_1, team_player_2_id=player_2)
         conn.add(new_team)
         return new_team
     
     return team
+
+
+def expected_score(player_rating:int, opponent_rating: list[int]):
+    average_opponent_rating = 0
+    for rating in opponent_rating:
+        average_opponent_rating += 1 / (1 + 10**((rating - player_rating) / 500))
+    average_opponent_rating /= len(opponent_rating)
+
+    return average_opponent_rating
+
+def calculate_rating_player(games_played: int, match_result: UploadMatch, player_rating: int, player_expected_score: int, team_actual_score: int) -> int:
+    k_value = 50 / (1 + games_played / 300)
+    point_factor = calculate_point_factor(abs(match_result.score_team_1 - match_result.score_team_2))
+    new_rating = player_rating + k_value * point_factor * (team_actual_score - player_expected_score)
+    return new_rating
+
+def calculate_rating_team(games_played: int, match_result: UploadMatch, team_rating: int, team_expected_score: float, team_actual_score: int) -> int:
+    k_value = 50 / (1 + games_played / 100)
+    point_factor = calculate_point_factor(abs(match_result.score_team_1 - match_result.score_team_2))
+    new_rating = team_rating + k_value * point_factor * (team_actual_score - team_expected_score)
+    return new_rating
 
 async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     # Connect to the database
@@ -152,45 +174,15 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     team1_rating, team2_rating = await get_team_ratings(team_1.id, team_2.id, conn)
 
     # Calculate the expected scores for the players
-    player1_expected_score_against_player3 = 1 / (1 + 10**((player3_rating - player1_rating) / 500))
-    player1_expected_score_against_player4 = 1 / (1 + 10**((player4_rating - player1_rating) / 500))
-    player1_expected_score = (player1_expected_score_against_player3 + player1_expected_score_against_player4) / 2
-   
-    player2_expected_score_against_player3 = 1 / (1 + 10**((player3_rating - player2_rating) / 500))
-    player2_expected_score_against_player4 = 1 / (1 + 10**((player4_rating - player2_rating) / 500))
-    player2_expected_score = (player2_expected_score_against_player3 + player2_expected_score_against_player4) / 2
-   
+    player1_expected_score = expected_score(player1_rating, [player3_rating, player4_rating])
+    player2_expected_score = expected_score(player2_rating, [player3_rating, player4_rating])
 
-    player3_expected_score_against_player1 = 1 / (1 + 10**((player1_rating - player3_rating) / 500))
-    player3_expected_score_against_player2 = 1 / (1 + 10**((player2_rating - player3_rating) / 500))
-    player3_expected_score = (player3_expected_score_against_player1 + player3_expected_score_against_player2) / 2
-   
-
-    player4_expected_score_against_player1 = 1 / (1 + 10**((player1_rating - player4_rating) / 500))
-    player4_expected_score_against_player2 = 1 / (1 + 10**((player2_rating - player4_rating) / 500))
-    player4_expected_score = (player4_expected_score_against_player1 + player4_expected_score_against_player2) / 2
-   
+    player3_expected_score = expected_score(player3_rating, [player1_rating, player2_rating])
+    player4_expected_score = expected_score(player4_rating, [player1_rating, player2_rating])
 
     # Calculate the expected scores for the teams
     team1_expected_score = (player1_expected_score + player2_expected_score) / 2
     team2_expected_score = (player3_expected_score + player4_expected_score) / 2
-
-    # Calculate the point factor to be used as a variable
-    score_difference = abs(match_result.score_team_1 - match_result.score_team_2)
-    point_factor = calculate_point_factor(score_difference)
-   
-    # Calculate the K value for each player based on the number of games played and their rating
-
-    k1 = 50 / (1 + games_played.player1_games / 300)
-    k2 = 50 / (1 + games_played.player2_games / 300)
-    k3 = 50 / (1 + games_played.player3_games / 300)
-    k4 = 50 / (1 + games_played.player4_games / 300)
-
-    #delta = 32 * (1 - winnerChanceToWin)
-
-    # Calculate the K value for each team based on the number of games played
-    k5 = 50 / (1 + number_of_games_team1/ 100)
-    k6 = 50 / (1 + number_of_games_team2/ 100)
 
     #logg the wining team
 
@@ -199,15 +191,15 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
        
     # Calculate the new Elo ratings for each player
     
-    player1_new_rating = player1_rating + k1 * point_factor  * (team1_actual_score - player1_expected_score)
-    player2_new_rating = player2_rating + k2 * point_factor  * (team1_actual_score - player2_expected_score)
-    player3_new_rating = player3_rating + k3 * point_factor  * (team2_actual_score - player3_expected_score)
-    player4_new_rating = player4_rating + k4 * point_factor  * (team2_actual_score - player4_expected_score)
+    player1_new_rating = calculate_rating_player(games_played.player1_games, match_result, player1_rating, player1_expected_score, team1_actual_score)
+    player2_new_rating = calculate_rating_player(games_played.player2_games, match_result, player2_rating, player2_expected_score, team1_actual_score)
+    player3_new_rating = calculate_rating_player(games_played.player3_games, match_result, player3_rating, player3_expected_score, team2_actual_score)
+    player4_new_rating = calculate_rating_player(games_played.player4_games, match_result, player4_rating, player4_expected_score, team2_actual_score)
 
 
     # Calculate the new Elo ratings for each team
-    team1_new_rating = team1_rating + k5 * point_factor * (team1_actual_score - team1_expected_score)
-    team2_new_rating = team2_rating + k6 * point_factor * (team2_actual_score - team2_expected_score)
+    team1_new_rating = calculate_rating_team(number_of_games_team1, match_result, team1_rating, team1_expected_score, team1_actual_score)
+    team2_new_rating = calculate_rating_team(number_of_games_team2, match_result, team2_rating, team2_expected_score, team2_actual_score)
     # Log the new ratings for teams
 
     # Update the database with the player ratings

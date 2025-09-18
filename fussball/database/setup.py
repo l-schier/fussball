@@ -30,7 +30,7 @@ else:
 
 async def get_session():
     async_session = async_sessionmaker(engine, expire_on_commit=False)
-    async with async_session() as session:
+    async with async_session(autoflush=False) as session:
         yield session
 
 
