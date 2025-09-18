@@ -7,11 +7,12 @@ import uvicorn
 from fussball.pages.default import default_route
 from fussball.pages.layout import Layout, pages
 from fussball.database.setup import _tempdir
+from fussball.app import FussballApp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def lifespan(app: UiwizApp):
+def lifespan(app: FussballApp):
     logger.info("Starting up...")
     with _tempdir:
         # Keep the temporary directory alive for the app lifetime

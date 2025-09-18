@@ -216,4 +216,4 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
         TeamRating(id=uuid.uuid4(), team_match_id=tm_2.id, rating=team2_new_rating, created_at=match_result.date)
     ])
 
-    conn.commit()
+    await conn.commit()
