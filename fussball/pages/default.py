@@ -11,13 +11,12 @@ from fussball.elo.elo_calculator import process_game_data
 default_route = PageRouter()
 
 def normlize_input(match_result: UploadMatchOptional) -> UploadMatch:
-    if match_result.player_1 is None or match_result.player_2 is None:
-        if match_result.player_1 is None and match_result.player_2 is not None:
-            match_result.player_1 = match_result.player_2
-            match_result.player_2 = None
-        elif match_result.player_3 is None and match_result.player_4 is not None:
-            match_result.player_3 = match_result.player_4
-            match_result.player_4 = None
+    if match_result.player_1 is None and match_result.player_2 is not None:
+        match_result.player_1 = match_result.player_2
+        match_result.player_2 = None
+    if match_result.player_3 is None and match_result.player_4 is not None:
+        match_result.player_3 = match_result.player_4
+        match_result.player_4 = None
     return UploadMatch.model_validate(match_result.model_dump())
 
 

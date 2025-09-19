@@ -183,12 +183,12 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     if match_result.player_2 is not None:
         player_match_p2 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_2, match_id=match.id)
         player_matches.append(player_match_p2)
-    if match_result.player_3 is not None:
-        player_match_p3 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_3, match_id=match.id)
-        player_matches.append(player_match_p3)
     
-    player_match_p4 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_4, match_id=match.id)
-    player_matches.append(player_match_p4)
+    player_match_p3 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_3, match_id=match.id)
+    player_matches.append(player_match_p3)
+    if match_result.player_4 is not None:
+        player_match_p4 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_4, match_id=match.id)
+        player_matches.append(player_match_p4)
 
     for pm in player_matches:
         conn.add(pm)
@@ -211,24 +211,35 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     # Call the get_player_ratings function inside the loop
     player1_rating, player2_rating, player3_rating, player4_rating = await get_player_ratings(match_result, conn)
 
+    player_ratings_versus_p12 = []
+    player_ratings_versus_p12.append(player3_rating)
+    if player4_rating is not None:
+        player_ratings_versus_p12.append(player4_rating)
+    
+    player_ratings_versus_p34 = []
+    player_ratings_versus_p34.append(player1_rating)
+    if player2_rating is not None:
+        player_ratings_versus_p34.append(player2_rating)
+
+    
     # Call the get_teams_ratings function inside the loop
     team1_rating, team2_rating = await get_team_ratings(team_1.id, team_2.id, conn)
 
     # Calculate the expected scores for the players
     t1_expected_rating = []
-    player1_expected_score = expected_score(player1_rating, [player3_rating, player4_rating])
+    player1_expected_score = expected_score(player1_rating, player_ratings_versus_p12)
     t1_expected_rating.append(player1_expected_score)
     player2_expected_score = None
     if player2_rating is not None:
-        player2_expected_score = expected_score(player2_rating, [player3_rating, player4_rating])
+        player2_expected_score = expected_score(player2_rating, player_ratings_versus_p12)
         t1_expected_rating.append(player2_expected_score)
 
     t2_expected_rating = []
-    player3_expected_score = expected_score(player3_rating, [player1_rating, player2_rating])
+    player3_expected_score = expected_score(player3_rating, player_ratings_versus_p34)
     t2_expected_rating.append(player3_expected_score)
     player4_expected_score = None
     if player4_rating is not None:
-        player4_expected_score = expected_score(player4_rating, [player1_rating, player2_rating])
+        player4_expected_score = expected_score(player4_rating, player_ratings_versus_p34)
         t2_expected_rating.append(player4_expected_score)
 
     # Calculate the expected scores for the teams
@@ -264,27 +275,25 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     # Log the new ratings for teams
 
     player_ratings = [
-        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p1, rating=player1_new_rating, created_at=match_result.date),
-        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p3, rating=player3_new_rating, created_at=match_result.date),
+        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p1.id, rating=player1_new_rating, created_at=match_result.date),
+        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p3.id, rating=player3_new_rating, created_at=match_result.date),
     ]
-    # if player2_rating is not None:
-    #     player_ratings.append(
-    #         PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p2, rating=player2_new_rating, created_at=match_result.date)
-    #     )
-    # if player4_rating is not None:
-    #     player_ratings.append(
-    #         PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p4, rating=player4_new_rating, created_at=match_result.date)
-    #     )
+    if player2_rating is not None:
+        player_ratings.append(
+            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p2.id, rating=player2_new_rating, created_at=match_result.date)
+        )
+    if player4_rating is not None:
+        player_ratings.append(
+            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p4.id, rating=player4_new_rating, created_at=match_result.date)
+        )
 
     # Update the database with the player ratings
     conn.add_all(
-        [
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p1, rating=player1_new_rating, created_at=match_result.date),
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p2, rating=player2_new_rating, created_at=match_result.date),
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p3, rating=player3_new_rating, created_at=match_result.date),
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p4, rating=player4_new_rating, created_at=match_result.date),
-        ]
+        player_ratings
     )
+
+    for pr in player_ratings:
+        print(f"PlayerMatch ID: {pr.player_match_id}, New Rating: {pr.rating}")
 
     # Update the database with the team ratings
     conn.add_all(
