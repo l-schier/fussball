@@ -290,6 +290,7 @@ dependencies = [
     { name = "dash-table" },
     { name = "flask" },
     { name = "flask-session" },
+    { name = "greenlet" },
     { name = "jinja2" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -319,6 +320,7 @@ requires-dist = [
     { name = "dash-table", specifier = "==5.0.0" },
     { name = "flask", specifier = "==2.2.2" },
     { name = "flask-session", specifier = "==0.4.0" },
+    { name = "greenlet", specifier = ">=3.2.4" },
     { name = "jinja2", specifier = "==3.1.2" },
     { name = "openpyxl", specifier = ">=3.0.10" },
     { name = "pandas", specifier = ">=2.3.2" },
@@ -330,7 +332,7 @@ requires-dist = [
     { name = "pytz", specifier = "==2023.3" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "sqlalchemy", specifier = ">2.0" },
-    { name = "uiwiz", specifier = ">=0.2.5a7" },
+    { name = "uiwiz", specifier = ">=0.2.5a8" },
 ]
 
 [package.metadata.requires-dev]
@@ -1017,7 +1019,7 @@ wheels = [
 
 [[package]]
 name = "uiwiz"
-version = "0.2.5a7"
+version = "0.2.5a8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
@@ -1029,9 +1031,9 @@ dependencies = [
     { name = "starlette-authlib" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/03/7d/119ec88a7a0e31d84a92ed241a3e2534b380f0fbe8ad69688ce0e408ef7d/uiwiz-0.2.5a7.tar.gz", hash = "sha256:0873c40a280ee8e2518a5cabc475b7e16099d7704c1b4cbf204b3d51d571d535", size = 1055773, upload-time = "2025-09-18T21:07:09.798Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/63/9f203afb1d22c4fdc26dd384cea389d2f4ca33170b10c1493f56bcb54a8a/uiwiz-0.2.5a8.tar.gz", hash = "sha256:6fa01744bb29e14c19e4d01199c483cadc5207dcdb9def208cdba365a2869fe4", size = 1055784, upload-time = "2025-09-19T05:33:35.217Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/55/66/793ffbb2dfc867635754fbe49d2279b82397b7a2b65953ac1f1f8d2b798f/uiwiz-0.2.5a7-py3-none-any.whl", hash = "sha256:f723727702bf6b16720b96b3b115b2ca8f4a5721f472caed08fbf57aa2545d57", size = 1080211, upload-time = "2025-09-18T21:07:08.064Z" },
+    { url = "https://files.pythonhosted.org/packages/15/5e/708209e5bb5ab6deef4ca2b097d33b6c326c4e0eac024816f30dab6b9053/uiwiz-0.2.5a8-py3-none-any.whl", hash = "sha256:ec49dba94248976ad0a354a0f7ce1b3c26433ad1e9b0933603b6f9a1f0bd0a32", size = 1080217, upload-time = "2025-09-19T05:33:33.996Z" },
 ]
 
 [[package]]

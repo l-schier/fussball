@@ -13,6 +13,7 @@ dependencies = [
     "dash-table==5.0.0",
     "flask==2.2.2",
     "flask-session==0.4.0",
+    "greenlet>=3.2.4",
     "jinja2==3.1.2",
     "openpyxl>=3.0.10",
     "pandas>=2.3.2",
@@ -24,10 +25,13 @@ dependencies = [
     "pytz==2023.3",
     "setuptools>=80.9.0",
     "sqlalchemy>2.0",
-    "uiwiz>=0.2.5a7",
+    "uiwiz>=0.2.5a8",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
 ]
+
+[tool.ruff]
+line-length=140
