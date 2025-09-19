@@ -2,7 +2,7 @@ from datetime import datetime
 from uiwiz import ui, PageRouter
 from fussball.database.setup import Connection
 from sqlalchemy import text
-from fussball.elo.upload_match import UploadMatch
+from fussball.elo.upload_match import UploadMatch, UploadMatchOptional
 from sqlalchemy import select
 
 from fussball.database.tables import Player
@@ -10,6 +10,15 @@ from fussball.elo.elo_calculator import process_game_data
 
 default_route = PageRouter()
 
+def normlize_input(match_result: UploadMatchOptional) -> UploadMatch:
+    if match_result.player_1 is None or match_result.player_2 is None:
+        if match_result.player_1 is None and match_result.player_2 is not None:
+            match_result.player_1 = match_result.player_2
+            match_result.player_2 = None
+        elif match_result.player_3 is None and match_result.player_4 is not None:
+            match_result.player_3 = match_result.player_4
+            match_result.player_4 = None
+    return UploadMatch.model_validate(match_result.model_dump())
 
 
 async def get_players(con: Connection):
@@ -39,8 +48,9 @@ def form_setup(player_options: list[ui.dropdownItem]):
 
 
 @default_route.ui("/match/submit")
-async def submit_match(data: UploadMatch, con: Connection):
+async def submit_match(data: UploadMatchOptional, con: Connection):
     print(data)
+    data = normlize_input(data)
     player_options = await get_players(con)
     form_setup(player_options)
     ui.toast("Match submitted!").success()
