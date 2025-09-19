@@ -104,7 +104,7 @@ async def number_of_games_player(match_result: UploadMatch, date, conn: AsyncSes
     )
 
 
-async def get_or_create_team(player_1: str, player_2: str, conn: AsyncSession) -> Team:
+async def get_or_create_team(player_1: uuid.UUID, player_2: uuid.UUID, conn: AsyncSession) -> Team:
     # Try to find the team using SQLAlchemy ORM
     team: Team = (
         (
@@ -176,6 +176,8 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     )
 
     conn.add(match)
+    player_matches = []
+    # continue here
     player_match_p1 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_1, match_id=match.id)
     player_match_p2 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_2, match_id=match.id)
     player_match_p3 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_3, match_id=match.id)
