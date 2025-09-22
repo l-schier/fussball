@@ -1,12 +1,15 @@
 from datetime import datetime
 from uiwiz import ui, PageRouter
+from fussball.database.dto import PlayerRatingInfo
 from fussball.database.setup import Connection
 from sqlalchemy import text
 from fussball.elo.upload_match import UploadMatch, UploadMatchOptional
 from sqlalchemy import select
 
 from fussball.database.tables import Player
+from fussball.database.queries import get_player_ratings_after_match, get_match_details, get_player_ratings_after_match
 from fussball.elo.elo_calculator import process_game_data
+from fussball.pages.fragment.ui_match import render_match
 
 default_route = PageRouter()
 
@@ -20,8 +23,8 @@ def normlize_input(match_result: UploadMatchOptional) -> UploadMatch:
     return UploadMatch.model_validate(match_result.model_dump())
 
 
-async def get_players(con: Connection):
-    players = (await con.execute(select(Player).filter(Player.active))).scalars().all()
+def get_players(con: Connection):
+    players = (con.execute(select(Player).filter(Player.active))).scalars().all()
     return [ui.dropdownItem(name=row.name, value=row.id) for row in players]
 
 def form_setup(player_options: list[ui.dropdownItem]):
@@ -50,19 +53,22 @@ def form_setup(player_options: list[ui.dropdownItem]):
 async def submit_match(data: UploadMatchOptional, con: Connection):
     print(data)
     data = normlize_input(data)
-    player_options = await get_players(con)
-    form_setup(player_options)
+
+    match_id = process_game_data(data, con)
+    match_details = get_match_details(con, match_id)
+    player_ratings: list[PlayerRatingInfo] = get_player_ratings_after_match(con, match_id)
+    
+    render_match(match_details, player_ratings)
     ui.toast("Match submitted!").success()
-    await process_game_data(data, con)
 
 @default_route.page("/")
 async def default_page(con: Connection):
     ui.element("h1", "Welcome to the Fussball App")
-    res = await con.execute(text("SELECT 1+1 AS result"))
+    res = con.execute(text("SELECT 1+1 AS result"))
     ui.element("p", "Dynamic value from DB:")
     ui.element("pre", f"1 + 1 = {res.scalar_one()}")
 
-    player_options = await get_players(con)
+    player_options = get_players(con)
     form_setup(player_options)
 
 def draw_player_dropdown(player_name: str, options: list[ui.dropdownItem]):

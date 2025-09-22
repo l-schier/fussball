@@ -1,10 +1,47 @@
-from sqlalchemy import select, func, desc, union_all, over
-from sqlalchemy.orm import aliased
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+from sqlalchemy import select, func, desc, union_all, over, text
+from sqlalchemy.orm import aliased, Session
 from fussball.database.tables import Player, PlayerMatch, PlayerRating, Match, Team
-from fussball.database.dto import PlayerRatingInfo
+from fussball.database.dto import PlayerRatingInfo, MatchDetails
 
-async def get_last_match_player_ratings_query(con: AsyncSession):
+def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
+    wt = aliased(Team, name="wt")
+    lt = aliased(Team, name="lt")
+    p1 = aliased(Player, name="p1")
+    p2 = aliased(Player, name="p2")
+    p3 = aliased(Player, name="p3")
+    p4 = aliased(Player, name="p4")
+
+
+    stmt = (
+        select(
+            Match.id.label("matchid"),
+            Match.created_at.label("created_at"),
+            p1.name.label("player1_name"),
+            p2.name.label("player2_name"),
+            p3.name.label("player3_name"),
+            p4.name.label("player4_name"),
+            Match.winning_team_score.label("team1_score"),
+            Match.losing_team_score.label("team2_score"),
+            wt.team_player_1_id.label("team1_player1_id"),
+            wt.team_player_2_id.label("team1_player2_id"),
+            lt.team_player_1_id.label("team2_player1_id"),
+            lt.team_player_2_id.label("team2_player2_id"),
+        )
+        .join(wt, Match.winning_team_id == wt.id)
+        .join(lt, Match.losing_team_id == lt.id)
+        .join(p1, wt.team_player_1_id == p1.id)
+        .join(p2, wt.team_player_2_id == p2.id)
+        .join(p3, lt.team_player_1_id == p3.id)
+        .join(p4, lt.team_player_2_id == p4.id)
+        .where(Match.id == match_id)
+        .limit(1)
+    )
+    result = con.execute(stmt)
+    out = result.fetchone()
+    return MatchDetails(*out)
+
+def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerRatingInfo]:
     # Get the last match
     last_match_subq = (
         select(
@@ -17,8 +54,7 @@ async def get_last_match_player_ratings_query(con: AsyncSession):
         )
         .join(Team, Match.winning_team_id == Team.id)
         .join(aliased(Team, name="lt"), Match.losing_team_id == aliased(Team, name="lt").id)
-        .order_by(desc(Match.id))
-        .limit(1)
+        .where(Match.id == match_id)
         .subquery()
     )
 
@@ -63,7 +99,7 @@ async def get_last_match_player_ratings_query(con: AsyncSession):
         .order_by(Player.id)
     )
 
-    result = await con.execute(query)
+    result = con.execute(query)
     rows = result.fetchall()
 
     # Convert rows to class instances

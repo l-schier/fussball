@@ -1,7 +1,7 @@
 import uuid
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import Session
 import math
 from fussball.elo.upload_match import UploadMatch
 from fussball.database.tables import Match, PlayerMatch, PlayerRating, Team, TeamMatch, TeamRating
@@ -18,8 +18,8 @@ def calculate_point_factor(score_difference):
     return 2 + (math.log(score_difference + 1) / math.log(10)) ** 3
 
 
-async def get_team_ratings(team1_id: int, team2_id: int, conn: AsyncSession) -> tuple[int, int]:
-    async def get_team_rating(team_id: int) -> int:
+def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, int]:
+    def get_team_rating(team_id: int) -> int:
         subquery = select(TeamMatch.id).where(TeamMatch.team_id == team_id)
         stmt = (
             select(TeamRating.rating, TeamRating.created_at)
@@ -27,16 +27,16 @@ async def get_team_ratings(team1_id: int, team2_id: int, conn: AsyncSession) -> 
             .order_by(desc(TeamRating.created_at))
             .limit(1)
         )
-        result = await conn.execute(stmt)
+        result = conn.execute(stmt)
         return result.scalar() or 1500
 
-    team1_rating = await get_team_rating(team1_id)
-    team2_rating = await get_team_rating(team2_id)
+    team1_rating = get_team_rating(team1_id)
+    team2_rating = get_team_rating(team2_id)
 
     return team1_rating, team2_rating
 
 
-async def get_player_rating_by_id(player_id: int, conn: AsyncSession) -> int:
+def get_player_rating_by_id(player_id: int, conn: Session) -> int:
     stmt = (
         select(PlayerRating.rating)
         .join(PlayerMatch, PlayerRating.player_match_id == PlayerMatch.id)
@@ -44,56 +44,55 @@ async def get_player_rating_by_id(player_id: int, conn: AsyncSession) -> int:
         .order_by(PlayerRating.created_at.desc())
         .limit(1)
     )
-    result = await conn.execute(stmt)
+    result = conn.execute(stmt)
     rating = result.scalar()
     if rating is None:
         return 1500
     return rating
 
 
-async def get_player_ratings(match_result: UploadMatch, conn: AsyncSession) -> tuple[int, int, int, int]:
-    player1_rating = await get_player_rating_by_id(match_result.player_1, conn)
-    player2_rating = await get_player_rating_by_id(match_result.player_2, conn) if match_result.player_2 is not None else None
-    player3_rating = await get_player_rating_by_id(match_result.player_3, conn)
-    player4_rating = await get_player_rating_by_id(match_result.player_4, conn) if match_result.player_4 is not None else None
+def get_player_ratings(match_result: UploadMatch, conn: Session) -> tuple[int, int, int, int]:
+    player1_rating = get_player_rating_by_id(match_result.player_1, conn)
+    player2_rating = get_player_rating_by_id(match_result.player_2, conn) if match_result.player_2 is not None else None
+    player3_rating = get_player_rating_by_id(match_result.player_3, conn)
+    player4_rating = get_player_rating_by_id(match_result.player_4, conn) if match_result.player_4 is not None else None
 
     return player1_rating, player2_rating, player3_rating, player4_rating
 
 
-async def number_of_games_team(team1_id: int, team2_id: int, date, conn: AsyncSession) -> tuple[int, int]:
-    async def get_number_of_games_by_team(team_id: int, date, conn: AsyncSession) -> int:
+def number_of_games_team(team1_id: int, team2_id: int, date, conn: Session) -> tuple[int, int]:
+    def get_number_of_games_by_team(team_id: int, date, conn: Session) -> int:
         stmt = (
             select(func.count())
             .select_from(Match)
             .where(((Match.winning_team_id == team_id) | (Match.losing_team_id == team_id)) & (Match.created_at <= date))
         )
-        result = await conn.execute(stmt)
+        result = conn.execute(stmt)
         number_of_game_team = result.scalar() or 0
         return number_of_game_team
 
-    number_of_game_team_1 = await get_number_of_games_by_team(team1_id, date, conn)
-    number_of_game_team_2 = await get_number_of_games_by_team(team2_id, date, conn)
+    number_of_game_team_1 = get_number_of_games_by_team(team1_id, date, conn)
+    number_of_game_team_2 = get_number_of_games_by_team(team2_id, date, conn)
 
     return (number_of_game_team_1, number_of_game_team_2)
 
 
-async def get_number_of_games_by_player(player_id: int, date, conn: AsyncSession) -> int:
+def get_number_of_games_by_player(player_id: int, date, conn: Session) -> int:
     stmt = (
         select(func.count())
         .select_from(PlayerMatch)
         .join(Match, PlayerMatch.match_id == Match.id)
         .where((PlayerMatch.player_id == player_id) & (Match.created_at <= date))
     )
-    result = await conn.execute(stmt)
+    result = conn.execute(stmt)
     number_of_game_player = result.scalar() or 0
     return number_of_game_player
 
-
-async def number_of_games_player(match_result: UploadMatch, date, conn: AsyncSession) -> GamesPlayed:
-    player1_games = await get_number_of_games_by_player(match_result.player_1, date, conn)
-    player2_games = await get_number_of_games_by_player(match_result.player_2, date, conn)
-    player3_games = await get_number_of_games_by_player(match_result.player_3, date, conn)
-    player4_games = await get_number_of_games_by_player(match_result.player_4, date, conn)
+def number_of_games_player(match_result: UploadMatch, date, conn: Session) -> GamesPlayed:
+    player1_games = get_number_of_games_by_player(match_result.player_1, date, conn)
+    player2_games = get_number_of_games_by_player(match_result.player_2, date, conn)
+    player3_games = get_number_of_games_by_player(match_result.player_3, date, conn)
+    player4_games = get_number_of_games_by_player(match_result.player_4, date, conn)
 
     # Return the number of games played by each player as a tuple
     return GamesPlayed(
@@ -104,11 +103,11 @@ async def number_of_games_player(match_result: UploadMatch, date, conn: AsyncSes
     )
 
 
-async def get_or_create_team(player_1: uuid.UUID, player_2: uuid.UUID, conn: AsyncSession) -> Team:
+def get_or_create_team(player_1: uuid.UUID, player_2: uuid.UUID, conn: Session) -> Team:
     # Try to find the team using SQLAlchemy ORM
     team: Team = (
         (
-            await conn.execute(
+            conn.execute(
                 select(Team).filter(
                     ((Team.team_player_1_id == player_1) & (Team.team_player_2_id == player_2))
                     | ((Team.team_player_1_id == player_2) & (Team.team_player_2_id == player_1))
@@ -153,13 +152,13 @@ def calculate_rating_team(
     return new_rating
 
 
-async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
+def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     # Connect to the database
 
     print("date is", match_result.date)
 
-    team_1 = await get_or_create_team(match_result.player_1, match_result.player_2, conn)
-    team_2 = await get_or_create_team(match_result.player_3, match_result.player_4, conn)
+    team_1 = get_or_create_team(match_result.player_1, match_result.player_2, conn)
+    team_2 = get_or_create_team(match_result.player_3, match_result.player_4, conn)
 
     if match_result.score_team_1 == match_result.score_team_2:
         raise ValueError("A match cannot end in a draw")
@@ -198,18 +197,18 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     conn.add(tm_1)
     conn.add(tm_2)
 
-    await conn.commit()
+    conn.commit()
 
     # Call the number_of_games_player function inside the loop
-    games_played = await number_of_games_player(match_result, match_result.date, conn)
+    games_played = number_of_games_player(match_result, match_result.date, conn)
 
     # Call the number_of_games_team function inside the loop
-    number_of_games_team1, number_of_games_team2 = await number_of_games_team(
+    number_of_games_team1, number_of_games_team2 = number_of_games_team(
         team1_id=team_1.id, team2_id=team_2.id, date=match_result.date, conn=conn
     )
 
     # Call the get_player_ratings function inside the loop
-    player1_rating, player2_rating, player3_rating, player4_rating = await get_player_ratings(match_result, conn)
+    player1_rating, player2_rating, player3_rating, player4_rating = get_player_ratings(match_result, conn)
 
     player_ratings_versus_p12 = []
     player_ratings_versus_p12.append(player3_rating)
@@ -223,7 +222,7 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
 
     
     # Call the get_teams_ratings function inside the loop
-    team1_rating, team2_rating = await get_team_ratings(team_1.id, team_2.id, conn)
+    team1_rating, team2_rating = get_team_ratings(team_1.id, team_2.id, conn)
 
     # Calculate the expected scores for the players
     t1_expected_rating = []
@@ -245,8 +244,6 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
     # Calculate the expected scores for the teams
     team1_expected_score = sum(t1_expected_rating) / len(t1_expected_rating)
     team2_expected_score = sum(t2_expected_rating) / len(t2_expected_rating)
-
-    # logg the wining team
 
     team1_actual_score = 1 if match_result.score_team_1 > match_result.score_team_2 else 0
     team2_actual_score = 1 if match_result.score_team_2 > match_result.score_team_1 else 0
@@ -303,4 +300,5 @@ async def process_game_data(match_result: UploadMatch, conn: AsyncSession):
         ]
     )
 
-    await conn.commit()
+    conn.commit()
+    return match.id
