@@ -162,6 +162,8 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
 
     if match_result.score_team_1 == match_result.score_team_2:
         raise ValueError("A match cannot end in a draw")
+    
+    conn.commit()
 
     match = Match(
         id=uuid.uuid4(),

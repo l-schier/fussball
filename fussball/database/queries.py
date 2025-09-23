@@ -23,17 +23,17 @@ def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
             p4.name.label("player4_name"),
             Match.winning_team_score.label("team1_score"),
             Match.losing_team_score.label("team2_score"),
-            wt.team_player_1_id.label("team1_player1_id"),
-            wt.team_player_2_id.label("team1_player2_id"),
-            lt.team_player_1_id.label("team2_player1_id"),
-            lt.team_player_2_id.label("team2_player2_id"),
+            # wt.team_player_1_id.label("team1_player1_id"),
+            # wt.team_player_2_id.label("team1_player2_id"),
+            # lt.team_player_1_id.label("team2_player1_id"),
+            # lt.team_player_2_id.label("team2_player2_id"),
         )
         .join(wt, Match.winning_team_id == wt.id)
         .join(lt, Match.losing_team_id == lt.id)
-        .join(p1, wt.team_player_1_id == p1.id)
-        .join(p2, wt.team_player_2_id == p2.id)
-        .join(p3, lt.team_player_1_id == p3.id)
-        .join(p4, lt.team_player_2_id == p4.id)
+        .outerjoin(p1, wt.team_player_1_id == p1.id)
+        .outerjoin(p2, wt.team_player_2_id == p2.id)
+        .outerjoin(p3, lt.team_player_1_id == p3.id)
+        .outerjoin(p4, lt.team_player_2_id == p4.id)
         .where(Match.id == match_id)
         .limit(1)
     )
@@ -43,64 +43,71 @@ def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
 
 def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerRatingInfo]:
     # Get the last match
-    last_match_subq = (
+        # Get the last match
+    wt = aliased(Team, name="wt")
+    lt = aliased(Team, name="lt")
+
+    last_match = (
         select(
             Match.id.label("match_id"),
             Match.created_at.label("match_time"),
-            Team.team_player_1_id.label("player1_id"),
-            Team.team_player_2_id.label("player2_id"),
-            aliased(Team, name="lt").team_player_1_id.label("player3_id"),
-            aliased(Team, name="lt").team_player_2_id.label("player4_id"),
+            wt.team_player_1_id.label("player1_id"),
+            wt.team_player_2_id.label("player2_id"),
+            lt.team_player_1_id.label("player3_id"),
+            lt.team_player_2_id.label("player4_id"),
         )
-        .join(Team, Match.winning_team_id == Team.id)
-        .join(aliased(Team, name="lt"), Match.losing_team_id == aliased(Team, name="lt").id)
+        .join(wt, Match.winning_team_id == wt.id)
+        .join(lt, Match.losing_team_id == lt.id)
         .where(Match.id == match_id)
-        .subquery()
+        .order_by(Match.id.desc())
+        .limit(1)
+        .cte("last_match")
     )
 
-    # Get all player IDs from last match
-    player_ids_subq = union_all(
-        select(last_match_subq.c.player1_id.label("player_id")),
-        select(last_match_subq.c.player2_id.label("player_id")),
-        select(last_match_subq.c.player3_id.label("player_id")),
-        select(last_match_subq.c.player4_id.label("player_id")),
+    # union of the four player id columns from last_match
+    players_union = union_all(
+        select(last_match.c.player1_id.label("player_id")),
+        select(last_match.c.player2_id.label("player_id")),
+        select(last_match.c.player3_id.label("player_id")),
+        select(last_match.c.player4_id.label("player_id")),
     ).subquery()
 
-    player_ratings_subq = (
+    pm = aliased(PlayerMatch, name="pm")
+    pr = aliased(PlayerRating, name="pr")
+
+    player_ratings = (
         select(
-            PlayerMatch.player_id,
-            PlayerRating.rating,
-            PlayerRating.player_rating_timestamp,
-            over(
-                func.row_number(),
-                partition_by=PlayerMatch.player_id,
-                order_by=desc(PlayerRating.player_rating_timestamp)
-            ).label("rn")
+            pm.player_id.label("player_id"),
+            pr.rating.label("rating"),
+            pr.created_at.label("created_at"),
+            func.row_number()
+            .over(partition_by=pm.player_id, order_by=pr.created_at.desc())
+            .label("rn"),
         )
-        .join(PlayerMatch, PlayerRating.player_match_id == PlayerMatch.id)
-        .where(PlayerMatch.player_id.in_(select(player_ids_subq.c.player_id)))
-        .subquery()
+        .join(pr, pr.player_match_id == pm.id)
+        .where(pm.player_id.in_(select(players_union.c.player_id)))
+        .cte("player_ratings")
     )
 
-    pr_before = aliased(player_ratings_subq, name="pr_before")
-    pr_after = aliased(player_ratings_subq, name="pr_after")
+    pr_before = player_ratings.alias("pr_before")
+    pr_after = player_ratings.alias("pr_after")
 
-    # Final select
-    query = (
+    p = aliased(Player, name="p")
+
+    final_stmt = (
         select(
-            Player.id.label("player_id"),
-            Player.name,
+            p.id.label("player_id"),
+            p.name,
             pr_before.c.rating.label("rating_before"),
             pr_after.c.rating.label("rating_after"),
         )
-        .outerjoin(pr_before, (Player.id == pr_before.c.player_id) & (pr_before.c.rn == 2))
-        .outerjoin(pr_after, (Player.id == pr_after.c.player_id) & (pr_after.c.rn == 1))
-        .where(Player.id.in_(select(player_ids_subq.c.player_id)))
-        .order_by(Player.id)
+        .select_from(p)
+        .outerjoin(pr_before, (p.id == pr_before.c.player_id) & (pr_before.c.rn == 2))
+        .outerjoin(pr_after, (p.id == pr_after.c.player_id) & (pr_after.c.rn == 1))
+        .where(p.id.in_(select(players_union.c.player_id)))
+        .order_by(p.id)
     )
 
-    result = con.execute(query)
+    result = con.execute(final_stmt)
     rows = result.fetchall()
-
-    # Convert rows to class instances
-    return [PlayerRatingInfo(*row) for row in rows]
+    return [PlayerRatingInfo.model_validate({**r._mapping}) for r in rows]

@@ -1,9 +1,9 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class PlayerRatingInfo:
+class PlayerRatingInfo(BaseModel):
     player_id: UUID
     name: str
     rating_before: int | None

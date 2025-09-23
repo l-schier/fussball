@@ -13,8 +13,10 @@ def initialize_database(engine):
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:
-        session.add_all([Player(name="player_1"), Player(name="player_2"), Player(name="player_3"), Player(name="player_4")])
-        session.commit()
+        session.query(Player).count()
+        if session.query(Player).count() == 0:
+            session.add_all([Player(name="player_1"), Player(name="player_2"), Player(name="player_3"), Player(name="player_4")])
+            session.commit()
 
 if settings.env == "dev":
     # Create a temporary directory for the app lifetime
@@ -25,6 +27,10 @@ else:
     engine = create_engine(
         f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.database}"
     )
+    try:
+        initialize_database(engine)
+    except Exception as e:
+        print(f"Error initializing database: {e}")
 
 def get_session():
     with Session(engine) as session:

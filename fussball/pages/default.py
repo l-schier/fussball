@@ -1,4 +1,5 @@
 from datetime import datetime
+from fastapi import Response
 from uiwiz import ui, PageRouter
 from fussball.database.dto import PlayerRatingInfo
 from fussball.database.setup import Connection
@@ -9,7 +10,7 @@ from sqlalchemy import select
 from fussball.database.tables import Player
 from fussball.database.queries import get_player_ratings_after_match, get_match_details, get_player_ratings_after_match
 from fussball.elo.elo_calculator import process_game_data
-from fussball.pages.fragment.ui_match import render_match
+from fussball.pages.fragment.ui_match import render_match_from_id
 
 default_route = PageRouter()
 
@@ -44,30 +45,26 @@ def form_setup(player_options: list[ui.dropdownItem]):
         with ui.element().classes("flex items-center justify-center w-full"):
             ui.label("Match Date")
         with ui.element().classes("flex items-center justify-center w-full"):
-            ui.datepicker(name="date", value=datetime.now()).classes("input")
+            dt = ui.datepicker(name="date", value=datetime.now()).classes("input")
+            dt.attributes["type"] = "datetime-local"
+            dt.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
         with ui.element().classes("flex items-center justify-center w-full"):
             ui.button("Submit game").classes("btn-primary")
 
 
 @default_route.ui("/match/submit")
-async def submit_match(data: UploadMatchOptional, con: Connection):
+async def submit_match(data: UploadMatchOptional, con: Connection, response: Response):
     print(data)
     data = normlize_input(data)
 
     match_id = process_game_data(data, con)
-    match_details = get_match_details(con, match_id)
-    player_ratings: list[PlayerRatingInfo] = get_player_ratings_after_match(con, match_id)
-    
-    render_match(match_details, player_ratings)
+    render_match_from_id(match_id, con)
     ui.toast("Match submitted!").success()
+
+    response.headers["HX-Push-Url"] = f"/match/{match_id}"
 
 @default_route.page("/")
 async def default_page(con: Connection):
-    ui.element("h1", "Welcome to the Fussball App")
-    res = con.execute(text("SELECT 1+1 AS result"))
-    ui.element("p", "Dynamic value from DB:")
-    ui.element("pre", f"1 + 1 = {res.scalar_one()}")
-
     player_options = get_players(con)
     form_setup(player_options)
 
