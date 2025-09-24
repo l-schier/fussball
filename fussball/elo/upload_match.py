@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -26,4 +26,4 @@ class UploadMatchOptional(BaseModel):
     player_4: Optional[UUID] = None
     score_team_2: int = Field(ge=0, lt=11)
 
-    date: datetime
+    date: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))

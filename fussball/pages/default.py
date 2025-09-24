@@ -42,12 +42,13 @@ def form_setup(player_options: list[ui.dropdownItem]):
         draw_player_dropdown("Player 4", player_options)
         draw_score_input("Score Team 2")
 
-        with ui.element().classes("flex items-center justify-center w-full"):
-            ui.label("Match Date")
-        with ui.element().classes("flex items-center justify-center w-full"):
-            dt = ui.datepicker(name="date", value=datetime.now()).classes("input")
-            dt.attributes["type"] = "datetime-local"
-            dt.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+        # # Date input disabled for now, always uses current datetime
+        # with ui.element().classes("flex items-center justify-center w-full"):
+        #     ui.label("Match Date")
+        # with ui.element().classes("flex items-center justify-center w-full"):
+        #     dt = ui.datepicker(name="date", value=datetime.now()).classes("input")
+        #     dt.attributes["type"] = "datetime-local"
+        #     dt.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
         with ui.element().classes("flex items-center justify-center w-full"):
             ui.button("Submit game").classes("btn-primary")
 
