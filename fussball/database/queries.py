@@ -1,27 +1,15 @@
 from uuid import UUID
-from sqlalchemy import select, func, desc, union_all, over, text
+from sqlalchemy import select, func, desc, union_all
 from sqlalchemy.orm import aliased, Session
 from fussball.database.tables import Player, PlayerMatch, PlayerRating, Match, Team
-from fussball.database.dto import PlayerRatingInfo, MatchDetails, MatchSummary
+from fussball.database.dto import PlayerRatingInfo, MatchDetails
 
 
-def list_matches(con: Session, limit: int = 10) -> list[MatchSummary]:
+def list_matches(con: Session, limit: int = 10) -> list[Match]:
     stmt = select(Match).order_by(desc(Match.created_at)).limit(limit)
     result = con.execute(stmt)
     rows = result.scalars().all()
-    return [
-        MatchSummary.model_validate(
-            {
-                "matchid": row.id,
-                "created_at": row.created_at,
-                "winning_team_score": row.winning_team_score,
-                "losing_team_score": row.losing_team_score,
-                "winning_team_id": row.winning_team_id,
-                "losing_team_id": row.losing_team_id,
-            }
-        )
-        for row in rows
-    ]
+    return rows
 
 
 def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
@@ -42,17 +30,13 @@ def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
             p4.name.label("player4_name"),
             Match.winning_team_score.label("team1_score"),
             Match.losing_team_score.label("team2_score"),
-            # wt.team_player_1_id.label("team1_player1_id"),
-            # wt.team_player_2_id.label("team1_player2_id"),
-            # lt.team_player_1_id.label("team2_player1_id"),
-            # lt.team_player_2_id.label("team2_player2_id"),
         )
         .join(wt, Match.winning_team_id == wt.id)
         .join(lt, Match.losing_team_id == lt.id)
-        .outerjoin(p1, wt.team_player_1_id == p1.id)
-        .outerjoin(p2, wt.team_player_2_id == p2.id)
-        .outerjoin(p3, lt.team_player_1_id == p3.id)
-        .outerjoin(p4, lt.team_player_2_id == p4.id)
+        .join(p1, wt.team_player_1_id == p1.id, isouter=True)
+        .join(p2, wt.team_player_2_id == p2.id, isouter=True)
+        .join(p3, lt.team_player_1_id == p3.id, isouter=True)
+        .join(p4, lt.team_player_2_id == p4.id, isouter=True)
         .where(Match.id == match_id)
         .limit(1)
     )
@@ -91,11 +75,15 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
         select(last_match.c.player3_id.label("player_id")),
         select(last_match.c.player4_id.label("player_id")),
     ).subquery()
-
+    
     pm = aliased(PlayerMatch, name="pm")
     pr = aliased(PlayerRating, name="pr")
 
-    player_ratings = (
+    # scalar subquery for match_time from last_match CTE
+    match_time_sq = select(last_match.c.match_time).scalar_subquery()
+
+    # ratings recorded for the given match (latest rating per player for that player_match)
+    pr_after = (
         select(
             pm.player_id.label("player_id"),
             pr.rating.label("rating"),
@@ -103,12 +91,28 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
             func.row_number().over(partition_by=pm.player_id, order_by=pr.created_at.desc()).label("rn"),
         )
         .join(pr, pr.player_match_id == pm.id)
-        .where(pm.player_id.in_(select(players_union.c.player_id)))
-        .cte("player_ratings")
+        .where(
+            pm.match_id == match_id,
+            pm.player_id.in_(select(players_union.c.player_id)),
+        )
+        .cte("pr_after")
     )
 
-    pr_before = player_ratings.alias("pr_before")
-    pr_after = player_ratings.alias("pr_after")
+    # latest rating before the match time for each player
+    pr_before = (
+        select(
+            pm.player_id.label("player_id"),
+            pr.rating.label("rating"),
+            pr.created_at.label("created_at"),
+            func.row_number().over(partition_by=pm.player_id, order_by=pr.created_at.desc()).label("rn"),
+        )
+        .join(pr, pr.player_match_id == pm.id)
+        .where(
+            pm.player_id.in_(select(players_union.c.player_id)),
+            pr.created_at < match_time_sq,
+        )
+        .cte("pr_before")
+    )
 
     p = aliased(Player, name="p")
 
@@ -120,7 +124,7 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
             pr_after.c.rating.label("rating_after"),
         )
         .select_from(p)
-        .join(pr_before, (p.id == pr_before.c.player_id) & (pr_before.c.rn == 2), isouter=True)
+        .join(pr_before, (p.id == pr_before.c.player_id) & (pr_before.c.rn == 1), isouter=True)
         .join(pr_after, (p.id == pr_after.c.player_id) & (pr_after.c.rn == 1), isouter=True)
         .where(p.id.in_(select(players_union.c.player_id)))
         .order_by(p.id)
