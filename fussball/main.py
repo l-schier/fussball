@@ -6,6 +6,7 @@ import logging
 import uvicorn
 from fussball.pages.default import default_route
 from fussball.pages.match import match_router as match_route
+from fussball.pages.player import player_router
 from fussball.pages.layout import Layout, pages
 from fussball.database.setup import _tempdir
 
@@ -25,6 +26,7 @@ app = UiwizApp(lifespan=lifespan, title="Fussball App", page_definition_class=La
 
 app.include_router(default_route)
 app.include_router(match_route)
+app.include_router(player_router)
 
 @app.get("/health")
 async def health_check():

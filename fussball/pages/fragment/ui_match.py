@@ -1,11 +1,11 @@
-from typing import Callable, List, Optional
+from typing import Callable, List
 from uiwiz import ui
-from app import rating
 from fussball.database.dto import MatchDetails, PlayerRatingInfo
 from fussball.database.tables import Match
 from sqlalchemy.orm import Session
 
 from fussball.database.queries import get_match_details, get_player_ratings_after_match, list_matches
+from fussball.pages.fragment.arrow import render_rating_diff
 
 def render_match_from_id(match_id: str, con: Session):
     match_details = get_match_details(con, match_id)
@@ -31,12 +31,8 @@ def render_match(match_details: MatchDetails, player_ratings: list[PlayerRatingI
                 with ui.element("tr"):
                     ui.element("td", str(player.player_id))
                     ui.element("td", player.name)
-                    rating_diff = player.rating_after - player.rating_before if player.rating_before is not None and player.rating_after is not None else 0
-                    arrow = "↑" if rating_diff > 0 else ("↓" if rating_diff < 0 else "")
                     with ui.element("td", f"{player.rating_after}"):
-                        cls = "text-green-500" if rating_diff > 0 else "text-red-500"
-                        ui.element("span", f" {arrow}").classes(cls)
-                        ui.element("span", f" ({rating_diff:+})").classes(cls)
+                        render_rating_diff(player.rating_after, player.rating_before)
 
 
 class MatchListTable(ui.element):

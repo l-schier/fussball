@@ -75,7 +75,7 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
         select(last_match.c.player3_id.label("player_id")),
         select(last_match.c.player4_id.label("player_id")),
     ).subquery()
-    
+
     pm = aliased(PlayerMatch, name="pm")
     pr = aliased(PlayerRating, name="pr")
 
