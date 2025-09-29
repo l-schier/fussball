@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select, func, desc, union_all
 from sqlalchemy.orm import aliased, Session
-from fussball.database.tables import Player, PlayerMatch, PlayerRating, Match, Team
+from fussball.database.tables import Player, PlayerRating, Match, Team
 from fussball.database.dto import PlayerRatingInfo, MatchDetails
 
 
@@ -75,8 +75,6 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
         select(last_match.c.player3_id.label("player_id")),
         select(last_match.c.player4_id.label("player_id")),
     ).subquery()
-
-    pm = aliased(PlayerMatch, name="pm")
     pr = aliased(PlayerRating, name="pr")
 
     # scalar subquery for match_time from last_match CTE
@@ -85,15 +83,14 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
     # ratings recorded for the given match (latest rating per player for that player_match)
     pr_after = (
         select(
-            pm.player_id.label("player_id"),
+            pr.player_id.label("player_id"),
             pr.rating.label("rating"),
             pr.created_at.label("created_at"),
-            func.row_number().over(partition_by=pm.player_id, order_by=pr.created_at.desc()).label("rn"),
+            func.row_number().over(partition_by=pr.player_id, order_by=pr.created_at.desc()).label("rn"),
         )
-        .join(pr, pr.player_match_id == pm.id)
         .where(
-            pm.match_id == match_id,
-            pm.player_id.in_(select(players_union.c.player_id)),
+            pr.match_id == match_id,
+            pr.player_id.in_(select(players_union.c.player_id)),
         )
         .cte("pr_after")
     )
@@ -101,14 +98,13 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
     # latest rating before the match time for each player
     pr_before = (
         select(
-            pm.player_id.label("player_id"),
+            pr.player_id.label("player_id"),
             pr.rating.label("rating"),
             pr.created_at.label("created_at"),
-            func.row_number().over(partition_by=pm.player_id, order_by=pr.created_at.desc()).label("rn"),
+            func.row_number().over(partition_by=pr.player_id, order_by=pr.created_at.desc()).label("rn"),
         )
-        .join(pr, pr.player_match_id == pm.id)
         .where(
-            pm.player_id.in_(select(players_union.c.player_id)),
+            pr.player_id.in_(select(players_union.c.player_id)),
             pr.created_at < match_time_sq,
         )
         .cte("pr_before")

@@ -37,19 +37,20 @@ class Match(Base):
     )
 
 
-class PlayerMatch(Base):
-    __tablename__ = "player_match"
+# class PlayerMatch(Base):
+#     __tablename__ = "player_match"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    player_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
-    match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
+#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+#     player_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
+#     match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
 
 
 class PlayerRating(Base):
     __tablename__ = "player_rating"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    player_match_id = Column(UUID(as_uuid=True), ForeignKey("player_match.id"), nullable=False)
+    match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
+    player_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
     rating = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False)
 

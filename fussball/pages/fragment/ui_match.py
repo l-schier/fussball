@@ -20,7 +20,7 @@ def render_match(match_details: MatchDetails, player_ratings: list[PlayerRatingI
     ui.element("p", f"Team 1 Score: {match_details.team1_score}")
     ui.element("p", f"Team 2 Score: {match_details.team2_score}")
 
-    with ui.element("table").classes("table w-full"):
+    with ui.element("table").classes("table table-zebra table-auto bg-base-300 overflow-scroll w-full whitespace-nowrap pr-4 pt-2 pb-2"):
         with ui.element("thead"):
             with ui.element("tr"):
                 ui.element("th", "Player ID")

@@ -2,7 +2,7 @@ from typing import Optional, override
 from uiwiz import PageDefinition, ui
 from uiwiz.svg.svg_handler import get_svg
 
-pages = ["/", "/match", "/players"]
+pages = ["/", "/match", "/player"]
 
 class Layout(PageDefinition):
     def __init__(self) -> None:

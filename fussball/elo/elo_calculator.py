@@ -1,10 +1,11 @@
+from datetime import datetime
 import uuid
 from pydantic import BaseModel
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 import math
 from fussball.elo.upload_match import UploadMatch
-from fussball.database.tables import Match, PlayerMatch, PlayerRating, Team, TeamMatch, TeamRating
+from fussball.database.tables import Match, PlayerRating, Team, TeamMatch, TeamRating
 
 
 class GamesPlayed(BaseModel):
@@ -39,8 +40,7 @@ def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, 
 def get_player_rating_by_id(player_id: int, conn: Session) -> int:
     stmt = (
         select(PlayerRating.rating)
-        .join(PlayerMatch, PlayerRating.player_match_id == PlayerMatch.id)
-        .where(PlayerMatch.player_id == player_id)
+        .where(PlayerRating.player_id == player_id)
         .order_by(PlayerRating.created_at.desc())
         .limit(1)
     )
@@ -77,18 +77,18 @@ def number_of_games_team(team1_id: int, team2_id: int, date, conn: Session) -> t
     return (number_of_game_team_1, number_of_game_team_2)
 
 
-def get_number_of_games_by_player(player_id: int, date, conn: Session) -> int:
+def get_number_of_games_by_player(player_id: int, date: datetime, conn: Session) -> int:
     stmt = (
         select(func.count())
-        .select_from(PlayerMatch)
-        .join(Match, PlayerMatch.match_id == Match.id)
-        .where((PlayerMatch.player_id == player_id) & (Match.created_at <= date))
+        .select_from(PlayerRating)
+        .join(Match, PlayerRating.match_id == Match.id)
+        .where((PlayerRating.player_id == player_id) & (Match.created_at <= date))
     )
     result = conn.execute(stmt)
     number_of_game_player = result.scalar() or 0
     return number_of_game_player
 
-def number_of_games_player(match_result: UploadMatch, date, conn: Session) -> GamesPlayed:
+def number_of_games_player(match_result: UploadMatch, date: datetime, conn: Session) -> GamesPlayed:
     player1_games = get_number_of_games_by_player(match_result.player_1, date, conn)
     player2_games = get_number_of_games_by_player(match_result.player_2, date, conn)
     player3_games = get_number_of_games_by_player(match_result.player_3, date, conn)
@@ -177,22 +177,6 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     )
 
     conn.add(match)
-    player_matches = []
-    # continue here
-    player_match_p1 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_1, match_id=match.id)
-    player_matches.append(player_match_p1)
-    if match_result.player_2 is not None:
-        player_match_p2 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_2, match_id=match.id)
-        player_matches.append(player_match_p2)
-    
-    player_match_p3 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_3, match_id=match.id)
-    player_matches.append(player_match_p3)
-    if match_result.player_4 is not None:
-        player_match_p4 = PlayerMatch(id=uuid.uuid4(), player_id=match_result.player_4, match_id=match.id)
-        player_matches.append(player_match_p4)
-
-    for pm in player_matches:
-        conn.add(pm)
 
     tm_1 = TeamMatch(id=uuid.uuid4(), team_id=team_1.id, match_id=match.id)
     tm_2 = TeamMatch(id=uuid.uuid4(), team_id=team_2.id, match_id=match.id)
@@ -274,16 +258,16 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     # Log the new ratings for teams
 
     player_ratings = [
-        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p1.id, rating=player1_new_rating, created_at=match_result.date),
-        PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p3.id, rating=player3_new_rating, created_at=match_result.date),
+        PlayerRating(id=uuid.uuid4(), match_id=match.id, player_id=match_result.player_1, rating=player1_new_rating, created_at=match_result.date),
+        PlayerRating(id=uuid.uuid4(), match_id=match.id, player_id=match_result.player_3, rating=player3_new_rating, created_at=match_result.date),
     ]
     if player2_rating is not None:
         player_ratings.append(
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p2.id, rating=player2_new_rating, created_at=match_result.date)
+            PlayerRating(id=uuid.uuid4(), match_id=match.id, player_id=match_result.player_2, rating=player2_new_rating, created_at=match_result.date)
         )
     if player4_rating is not None:
         player_ratings.append(
-            PlayerRating(id=uuid.uuid4(), player_match_id=player_match_p4.id, rating=player4_new_rating, created_at=match_result.date)
+            PlayerRating(id=uuid.uuid4(), match_id=match.id, player_id=match_result.player_4, rating=player4_new_rating, created_at=match_result.date)
         )
 
     # Update the database with the player ratings
@@ -292,7 +276,7 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     )
 
     for pr in player_ratings:
-        print(f"PlayerMatch ID: {pr.player_match_id}, New Rating: {pr.rating}")
+        print(f"PlayerMatch ID: {pr.match_id}, New Rating: {pr.rating}")
 
     # Update the database with the team ratings
     conn.add_all(

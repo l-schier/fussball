@@ -1,14 +1,10 @@
-from datetime import datetime
 from fastapi import Response
 from uiwiz import ui, PageRouter
-from fussball.database.dto import PlayerRatingInfo
 from fussball.database.setup import Connection
-from sqlalchemy import text
 from fussball.elo.upload_match import UploadMatch, UploadMatchOptional
 from sqlalchemy import select
 
 from fussball.database.tables import Player
-from fussball.database.queries import get_player_ratings_after_match, get_match_details, get_player_ratings_after_match
 from fussball.elo.elo_calculator import process_game_data
 from fussball.pages.fragment.ui_match import render_match_from_id
 
