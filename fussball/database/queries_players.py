@@ -1,8 +1,7 @@
 from uuid import UUID
-from sqlalchemy import select, func, desc, union_all
-from sqlalchemy.orm import aliased, Session
-from fussball.database.tables import Player, PlayerRating, Match, Team
-from fussball.database.dto import PlayerRatingInfo, MatchDetails
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
+from fussball.database.tables import Player, PlayerRating
 from pydantic.dataclasses import dataclass
 
 @dataclass
@@ -27,28 +26,29 @@ def list_players(con: Session) -> list[Player]:
     return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
 
 
-def show_player(con: Session, player_id: UUID) -> Player:
-    stmt = select(Player).where(Player.id == player_id).limit(1)
-    result = con.execute(stmt)
-    player = result.scalar_one_or_none()
-
-    latest_rating_subq = (
-        select(PlayerRating.rating)
-        .where(Player.id == player_id)
-        .order_by(PlayerRating.created_at.desc())
-        .limit(1)
-        .scalar_subquery()
+def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
+    output = con.execute(
+        text("""
+            SELECT
+                player.id,
+                player.name,
+                player.active,
+                player_rating.rating,
+                player_rating.created_at
+            FROM player
+            LEFT JOIN player_rating ON player.id = player_rating.player_id
+            WHERE player.id = :player_id
+            ORDER BY player_rating.created_at DESC
+            LIMIT 10
+        """),
+        {"player_id": player_id}
     )
-
-    player_ratings_stmt = (
-        select(PlayerRating)
-        .where(Player.id == player_id)
-        .limit(10)
-        .order_by(PlayerRating.created_at.desc())
+    rows = output.all()
+    if not rows:
+        raise ValueError(f"Player with id {player_id} not found")
+    return PlayerWithRating(
+        id=rows[0].id,
+        name=rows[0].name,
+        ranking=rows[0].rating,
+        history=[dict(row._mapping) for row in rows]
     )
-
-    player_rating = PlayerWithRating(id=player.id, name=player.name, ranking=None)
-
-    player_ratings = con.execute(player_ratings_stmt).fetchall()
-    player.history = [dict(row) for row in player_ratings]
-    return player

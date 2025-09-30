@@ -9,6 +9,12 @@ class PlayerRatingInfo(BaseModel):
     rating_before: int | None
     rating_after: int | None
 
+class PlayerWithRating(BaseModel):
+    id: UUID
+    name: str
+    ranking: int | None
+    history: list[dict] = []
+
 @dataclass
 class MatchDetails:
     matchid: UUID

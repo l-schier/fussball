@@ -36,15 +36,6 @@ class Match(Base):
         CheckConstraint("losing_team_score >= 0 AND losing_team_score != 10", name="losing_team_score_check"),
     )
 
-
-# class PlayerMatch(Base):
-#     __tablename__ = "player_match"
-
-#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-#     player_id = Column(UUID(as_uuid=True), ForeignKey("player.id"), nullable=False)
-#     match_id = Column(UUID(as_uuid=True), ForeignKey("match.id"), nullable=False)
-
-
 class PlayerRating(Base):
     __tablename__ = "player_rating"
 
