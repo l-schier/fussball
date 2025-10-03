@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 from fussball.database.tables import Player, PlayerRating
 from pydantic.dataclasses import dataclass
 
+
 @dataclass
 class PlayerWithRating:
     id: UUID
     name: str
     ranking: int | None
     history: list[dict] = None
+
 
 def list_players(con: Session) -> list[Player]:
     latest_rating_subq = (
@@ -41,14 +43,9 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
             ORDER BY player_rating.created_at DESC
             LIMIT 10
         """),
-        {"player_id": player_id}
+        {"player_id": player_id},
     )
     rows = output.all()
     if not rows:
         raise ValueError(f"Player with id {player_id} not found")
-    return PlayerWithRating(
-        id=rows[0].id,
-        name=rows[0].name,
-        ranking=rows[0].rating,
-        history=[dict(row._mapping) for row in rows]
-    )
+    return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=[dict(row._mapping) for row in rows])

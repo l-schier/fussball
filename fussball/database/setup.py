@@ -4,11 +4,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from fussball.config import settings
 from fussball.database.tables import Base, Player
+from testcontainers.postgres import PostgresContainer
 
-import tempfile
-import os
+container = PostgresContainer()
+engine = None
 
-_tempdir = tempfile.TemporaryDirectory()
+
+def setup_database():
+    with container:
+        global engine
+        import time
+
+        time.sleep(5)
+        engine = create_engine(container.get_connection_url())
+        initialize_database(engine)
+        yield
+
+
 def initialize_database(engine):
     Base.metadata.create_all(engine)
 
@@ -18,19 +30,14 @@ def initialize_database(engine):
             session.add_all([Player(name="player_1"), Player(name="player_2"), Player(name="player_3"), Player(name="player_4")])
             session.commit()
 
-if settings.env == "dev":
-    # Create a temporary directory for the app lifetime
-    db_path = os.path.join(_tempdir.name, "dev.sqlite3")
-    engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-    initialize_database(engine)
-else:
-    engine = create_engine(
-        f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.database}"
-    )
+
+if settings.env != "dev":
+    engine = create_engine(f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.database}")
     try:
         initialize_database(engine)
     except Exception as e:
         print(f"Error initializing database: {e}")
+
 
 def get_session():
     with Session(engine) as session:

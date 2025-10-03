@@ -32,6 +32,7 @@ dependencies = [
 dev = [
     "black>=25.9.0",
     "pytest>=8.4.2",
+    "testcontainers>=4.13.1",
 ]
 
 [tool.ruff]
