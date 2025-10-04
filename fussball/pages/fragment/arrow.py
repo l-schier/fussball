@@ -5,5 +5,7 @@ def render_rating_diff(player_rating_after: int, player_rating_before: int | Non
     arrow = "↑" if rating_diff > 0 else ("↓" if rating_diff < 0 else "")
     
     cls = "text-green-500" if rating_diff > 0 else "text-red-500"
+    if rating_diff == 0:
+        cls = "text-gray-500"
     ui.element("span", f" {arrow}").classes(cls)
     ui.element("span", f" ({rating_diff:+})").classes(cls)

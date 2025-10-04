@@ -1,9 +1,36 @@
+from uuid import uuid4
+from pydantic import BaseModel
 from uiwiz import PageRouter
 from fussball.database.setup import Connection
 from fussball.database.queries_players import list_players, show_player
 from fussball.pages.fragment.ui_player import render_player, render_player_list
+from fussball.database.tables import Player
+from uiwiz import ui
 
 player_router = PageRouter(prefix="/player")
+
+class PlayerDTO(BaseModel):
+    name: str
+
+
+@player_router.ui("/submit/new")
+def submit_player(data: PlayerDTO, con: Connection):
+
+    new_player = Player(id=uuid4(), name=data.name, active=True)
+    con.add(new_player)
+    con.commit()
+
+    ui.toast(f"Creating player {data.name}").success()
+    pass  # TODO: Implement player creation
+
+
+@player_router.page("/new")
+def new_player(con: Connection):
+    with ui.form().classes("border border-base-content rounded-lg shadow-lg w-full items-center").on_submit(submit_player, swap="none"):
+        ui.label("Add new player")
+        ui.input(name="name", placeholder="Player Name").set_floating_label().classes("input")
+        ui.button("Create Player").classes("btn-primary")
+
 
 @player_router.page("/{player_id}")
 def view_player(player_id: str, con: Connection):
@@ -13,4 +40,4 @@ def view_player(player_id: str, con: Connection):
 @player_router.page("/")
 def player_list_page(con: Connection):
     players = list_players(con)
-    render_player_list(players, redirect=view_player)
+    render_player_list(players)

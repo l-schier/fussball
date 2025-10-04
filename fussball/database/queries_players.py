@@ -36,9 +36,11 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
                 player.name,
                 player.active,
                 player_rating.rating,
-                player_rating.created_at
+                player_rating.created_at,
+                match.id AS match_id
             FROM player
             LEFT JOIN player_rating ON player.id = player_rating.player_id
+            LEFT JOIN match ON player_rating.match_id = match.id
             WHERE player.id = :player_id
             ORDER BY player_rating.created_at DESC
             LIMIT 10

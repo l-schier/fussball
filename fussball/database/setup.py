@@ -4,22 +4,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from fussball.config import settings
 from fussball.database.tables import Base, Player
-from testcontainers.postgres import PostgresContainer
 
-container = PostgresContainer()
+
 engine = None
-
-
-def setup_database():
-    with container:
-        global engine
-        import time
-
-        time.sleep(5)
-        engine = create_engine(container.get_connection_url())
-        initialize_database(engine)
-        yield
-
 
 def initialize_database(engine):
     Base.metadata.create_all(engine)

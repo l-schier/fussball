@@ -8,7 +8,6 @@ from fussball.pages.default import default_route
 from fussball.pages.match import match_router as match_route
 from fussball.pages.player import player_router
 from fussball.pages.layout import Layout, pages
-from fussball.database.setup import setup_database
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,10 +15,8 @@ logger = logging.getLogger(__name__)
 
 def lifespan(app: UiwizApp):
     logger.info("Starting up...")
-    next(setup_database())
     yield
     logger.info("Shutting down...")
-    next(setup_database())
 
 
 app = UiwizApp(lifespan=lifespan, title="Fussball App", page_definition_class=Layout, theme="dark")
