@@ -6,6 +6,7 @@ from fussball.database.queries_players import list_players, show_player
 from fussball.pages.fragment.ui_player import render_player, render_player_list
 from fussball.database.tables import Player
 from uiwiz import ui
+from sqlalchemy import text
 
 player_router = PageRouter(prefix="/player")
 
@@ -15,13 +16,15 @@ class PlayerDTO(BaseModel):
 
 @player_router.ui("/submit/new")
 def submit_player(data: PlayerDTO, con: Connection):
-
+    result = con.execute(text("SELECT name FROM player WHERE name = :name"), {"name": data.name})
+    if result.first():
+        ui.toast(f"Player with name {data.name} already exists").error()
+        return
     new_player = Player(id=uuid4(), name=data.name, active=True)
     con.add(new_player)
     con.commit()
 
     ui.toast(f"Creating player {data.name}").success()
-    pass  # TODO: Implement player creation
 
 
 @player_router.page("/new")
