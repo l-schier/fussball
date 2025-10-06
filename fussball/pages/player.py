@@ -1,6 +1,6 @@
 from uuid import uuid4
 from pydantic import BaseModel
-from uiwiz import PageRouter
+from uiwiz import Page, PageDefinition, PageRouter
 from fussball.database.setup import Connection
 from fussball.database.queries_players import list_players, show_player
 from fussball.pages.fragment.ui_player import render_player, render_player_list
@@ -8,7 +8,16 @@ from fussball.database.tables import Player
 from uiwiz import ui
 from sqlalchemy import text
 
+from fussball.pages.layout import Layout
+
 player_router = PageRouter(prefix="/player")
+
+# custom width for player details
+class PageContentWidth(Layout):
+    def __init__(self) -> None:
+        super().__init__()
+        self.max_width = "max-w-7xl"
+
 
 class PlayerDTO(BaseModel):
     name: str
@@ -35,8 +44,8 @@ def new_player(con: Connection):
         ui.button("Create Player").classes("btn-primary")
 
 
-@player_router.page("/{player_id}")
-def view_player(player_id: str, con: Connection):
+@player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
+def view_player(player_id: str, con: Connection, page: Page):
     player = show_player(con, player_id)
     render_player(player)
 

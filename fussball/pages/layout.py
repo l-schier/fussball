@@ -14,6 +14,7 @@ class Layout(PageDefinition):
         self.drawer = None
         self._nav = None
         self.hide_on = "md"
+        self.max_width = "max-w-[960px]"
 
     @override
     def content(self, _: ui.element) -> Optional[ui.element]:
@@ -21,7 +22,7 @@ class Layout(PageDefinition):
         with self.drawer:
             with self.drawer.drawer_content():
                 self.nav(self.drawer)
-                container = ui.container(padding="p-4")
+                container = ui.container(max_w=self.max_width, padding="p-4")
             
             with self.drawer.drawer_side():
                 with ui.element("ul").classes("flex-none block md:hidden w-full"):

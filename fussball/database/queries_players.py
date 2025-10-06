@@ -22,7 +22,7 @@ def list_players(con: Session) -> list[Player]:
         .scalar_subquery()
     )
 
-    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(Player.name)
+    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(latest_rating_subq.desc().nullslast())
     result = con.execute(stmt)
     rows = result.fetchall()
     return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
