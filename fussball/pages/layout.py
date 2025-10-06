@@ -1,8 +1,8 @@
 from typing import Optional, override
 from uiwiz import PageDefinition, ui
 from uiwiz.svg.svg_handler import get_svg
+from fussball.pages import page_routes
 
-pages = ["/", "/match", "/player"]
 
 class Layout(PageDefinition):
     def __init__(self) -> None:
@@ -25,7 +25,7 @@ class Layout(PageDefinition):
             
             with self.drawer.drawer_side():
                 with ui.element("ul").classes("flex-none block md:hidden w-full"):
-                    for page in pages:
+                    for page in page_routes.values():
                         with ui.element("li"):
                             ui.link(page, page)
                     with ui.element("li"):
@@ -45,8 +45,8 @@ class Layout(PageDefinition):
                         ui.html(get_svg("menu"))
                 with ui.element().classes(f"flex-none hidden {self.hide_on}:!block"):
                     with ui.element("ul").classes("menu menu-horizontal menu-md"):
-                        for page in pages:
+                        for page, route in page_routes.items():
                             with ui.element("li"):
-                                ui.link(page, page)
+                                ui.link(page, route)
                         with ui.element("li"):
                             ui.themeSelector(["dark", "nord"])

@@ -1,7 +1,7 @@
 from uiwiz import ui
 from sqlalchemy.orm import Session
 from fussball.database.dto import MatchDetails, PlayerRatingInfo
-from fussball.pages.routes import routes
+from fussball.pages import routes
 
 from fussball.database.queries import get_match_details, get_player_ratings_after_match, list_matches
 from fussball.pages.fragment.arrow import render_rating_diff
@@ -28,7 +28,7 @@ def render_match(match_details: MatchDetails, player_ratings: list[PlayerRatingI
         with ui.element("tbody"):
             for player in player_ratings:
                 with ui.element("tr").classes("cursor-pointer hover:bg-base-100") as row_ele:
-                    row_ele.attributes["onclick"] = f"window.location.href='{routes['player'].format(player_id=player.player_id)}'"
+                    row_ele.attributes["onclick"] = f"window.location.href='{routes['player_detail'].format(player_id=player.player_id)}'"
                     ui.element("td", str(player.player_id))
                     ui.element("td", player.name)
                     with ui.element("td", f"{player.rating_after}"):
@@ -48,7 +48,7 @@ def render_match_list(con: Session):
         with ui.element("tbody"):
             for match in matches:
                 with ui.element("tr").classes("cursor-pointer hover:bg-base-100") as row_ele:
-                    row_ele.attributes["onclick"] = f"window.location.href='{routes['match'].format(match_id=match.id)}'"
+                    row_ele.attributes["onclick"] = f"window.location.href='{routes['match_detail'].format(match_id=match.id)}'"
                     ui.element("td", str(match.id))
                     ui.element("td", str(match.winning_team_score))
                     ui.element("td", str(match.losing_team_score))

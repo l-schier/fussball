@@ -1,7 +1,7 @@
 from uiwiz import ui
 from fussball.database.dto import PlayerWithRating
 from fussball.pages.fragment.arrow import render_rating_diff
-from fussball.pages.routes import routes
+from fussball.pages import routes
 
 
 def render_player(player: PlayerWithRating):
@@ -21,7 +21,7 @@ def render_player(player: PlayerWithRating):
                     history = player.history
                     for i, rating in enumerate(history):
                         with ui.element("tr").classes("cursor-pointer hover:bg-base-100") as row_ele:
-                            row_ele.attributes["onclick"] = f"window.location.href='{routes['match'].format(match_id=rating.get('match_id'))}'"
+                            row_ele.attributes["onclick"] = f"window.location.href='{routes['match_detail'].format(match_id=rating.get('match_id'))}'"
                             previous_rating = history[i + 1]["rating"] if i + 1 < len(history) else None
                             with ui.element("td", str(rating["rating"])):
                                 render_rating_diff(rating["rating"], previous_rating)
@@ -63,7 +63,7 @@ def render_player_list(players: list[PlayerWithRating]):
         with ui.element("tbody"):
             for player in players:
                 with ui.element("tr").classes("cursor-pointer hover:bg-base-100") as row:
-                    row.attributes["onclick"] = f"window.location.href='{routes['player'].format(player_id=player.id)}'"
+                    row.attributes["onclick"] = f"window.location.href='{routes['player_detail'].format(player_id=player.id)}'"
                     ui.element("td", player.name)
                     ui.element("td", str(player.id))
                     ui.element("td", str(player.ranking))

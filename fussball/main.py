@@ -7,7 +7,7 @@ import uvicorn
 from fussball.pages.default import default_route
 from fussball.pages.match import match_router as match_route
 from fussball.pages.player import player_router
-from fussball.pages.layout import Layout, pages
+from fussball.pages.layout import Layout, page_routes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,8 +34,8 @@ async def health_check():
 async def not_found():
     with ui.container(padding="p-4"):
         ui.markdown("Page not found. Please check the URL or return to the home page.")
-        for page in pages:
-            ui.link(page, page)
+        for page, route in page_routes.items():
+            ui.link(page, route)
 
 
 @app.exception_handler(404)
