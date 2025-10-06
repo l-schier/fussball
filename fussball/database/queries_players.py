@@ -50,4 +50,14 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
     rows = output.all()
     if not rows:
         raise ValueError(f"Player with id {player_id} not found")
-    return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=[dict(row._mapping) for row in rows])
+    
+    history = []
+    for row in rows:
+        if row.rating is not None:
+            history.append({
+                "rating": row.rating,
+                "created_at": row.created_at,
+                "match_id": row.match_id,
+            })
+
+    return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)
