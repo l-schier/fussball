@@ -1,3 +1,4 @@
+from tempfile import TemporaryFile
 from typing_extensions import Annotated
 from fastapi.params import Depends
 from sqlalchemy import create_engine
@@ -18,12 +19,18 @@ def initialize_database(engine):
             session.commit()
 
 
-if settings.env != "dev":
+if settings.database_type == "postgresql":
     engine = create_engine(f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.database}")
     try:
         initialize_database(engine)
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+elif settings.database_type == "sqlite":
+    with TemporaryFile() as tf:
+        print(f"Using temporary SQLite database at {tf.name}")
+        engine = create_engine(f"sqlite:///{tf.name}.db")
+        initialize_database(engine)
 
 
 def get_session():

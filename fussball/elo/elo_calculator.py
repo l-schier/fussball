@@ -140,7 +140,7 @@ def calculate_rating_player(
     k_value = 50 / (1 + games_played / 300)
     point_factor = calculate_point_factor(abs(match_result.score_team_1 - match_result.score_team_2))
     new_rating = player_rating + k_value * point_factor * (team_actual_score - player_expected_score)
-    return new_rating
+    return round(new_rating)
 
 
 def calculate_rating_team(

@@ -1,7 +1,7 @@
 from uuid import UUID
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from fussball.database.tables import Player, PlayerRating
+from fussball.database.tables import Match, Player, PlayerRating
 from pydantic.dataclasses import dataclass
 
 
@@ -29,27 +29,28 @@ def list_players(con: Session) -> list[Player]:
 
 
 def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
-    output = con.execute(
-        text("""
-            SELECT
-                player.id,
-                player.name,
-                player.active,
-                player_rating.rating,
-                player_rating.created_at,
-                match.id AS match_id
-            FROM player
-            LEFT JOIN player_rating ON player.id = player_rating.player_id
-            LEFT JOIN match ON player_rating.match_id = match.id
-            WHERE player.id = :player_id
-            ORDER BY player_rating.created_at DESC
-            LIMIT 10
-        """),
-        {"player_id": player_id},
+    stmt = (
+        select(
+            Player.id,
+            Player.name,
+            Player.active,
+            PlayerRating.rating,
+            PlayerRating.created_at,
+            Match.id.label("match_id")
+        )
+        .select_from(Player)
+        .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
+        .join(Match, PlayerRating.match_id == Match.id, isouter=True)
+        .where(Player.id == player_id)
+        .order_by(PlayerRating.created_at.desc())
+        .limit(10)
     )
-    rows = output.all()
-    if not rows:
-        raise ValueError(f"Player with id {player_id} not found")
+    
+    result = con.execute(stmt)
+    rows = result.fetchall()
+
+    if rows == []:
+        return rows
     
     history = []
     for row in rows:

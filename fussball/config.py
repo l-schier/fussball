@@ -1,14 +1,14 @@
+from typing import Literal
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    host: str
-    database: str
-    user: str
-    password: str
-    port: str
-    env: str = "dev"
-    connection_url: str | None = None
+    host: str | None = None
+    database: str | None = None
+    user: str | None = None
+    password: str | None = None
+    port: str | None = None
+    database_type: Literal["postgresql", "sqlite"] = "sqlite"
 
 
 settings = Settings()

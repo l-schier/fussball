@@ -1,6 +1,7 @@
 from uuid import uuid4
+import uuid
 from pydantic import BaseModel
-from uiwiz import Page, PageDefinition, PageRouter
+from uiwiz import Page, PageRouter
 from fussball.database.setup import Connection
 from fussball.database.queries_players import list_players, show_player
 from fussball.pages.fragment.ui_player import render_player, render_player_list
@@ -46,7 +47,7 @@ def new_player(con: Connection):
 
 @player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
 def view_player(player_id: str, con: Connection, page: Page):
-    player = show_player(con, player_id)
+    player = show_player(con, uuid.UUID(player_id))
     render_player(player)
 
 @player_router.page("/")
