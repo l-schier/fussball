@@ -132,3 +132,4 @@ dmypy.json
 elo_log.txt
 
 .vscode
+data/*
