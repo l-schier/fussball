@@ -86,6 +86,9 @@ class Match(Base):
             "losing_team_score >= 0 AND losing_team_score != 10",
             name="losing_team_score_check",
         ),
+        CheckConstraint(
+            "winning_team_score > losing_team_score", name="winning_team_won_check"
+        ),
     )
 
 
