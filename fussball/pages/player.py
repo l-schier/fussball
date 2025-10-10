@@ -6,7 +6,7 @@ from database.setup import Connection
 from database.queries_players import list_players, show_player
 from pages.fragment.ui_player import render_player, render_player_list
 from database.tables import Player
-from datetime import datetime
+from datetime import datetime, timezone
 from uiwiz import ui
 from sqlalchemy import text
 
@@ -35,7 +35,10 @@ def submit_player(data: PlayerDTO, con: Connection):
         ui.toast(f"Player with name {data.name} already exists").error()
         return
     new_player = Player(
-        id=uuid4(), name=data.name, active=True, created_at=datetime.now()
+        id=uuid4(),
+        name=data.name,
+        active=True,
+        created_at=datetime.now(tz=timezone.utc),
     )
     con.add(new_player)
     con.commit()

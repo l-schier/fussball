@@ -49,9 +49,9 @@ def form_setup(player_options: list[ui.dropdownItem]):
         # with ui.element().classes("flex items-center justify-center w-full"):
         #     ui.label("Match Date")
         # with ui.element().classes("flex items-center justify-center w-full"):
-        #     dt = ui.datepicker(name="date", value=datetime.now()).classes("input")
+        #     dt = ui.datepicker(name="date", value=datetime.now(tz=timezone.utc)).classes("input")
         #     dt.attributes["type"] = "datetime-local"
-        #     dt.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+        #     dt.value = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M")
         with ui.element().classes("flex items-center justify-center w-full"):
             ui.button("Submit game").classes("btn-primary")
 

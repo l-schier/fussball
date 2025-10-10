@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from pydantic import BaseModel
 from sqlalchemy import select, func, desc
@@ -143,7 +143,10 @@ def get_or_create_team(player_1: uuid.UUID, player_2: uuid.UUID, conn: Session) 
     )
     if team is None:
         new_team = Team(
-            id=uuid.uuid4(), team_player_1_id=player_1, team_player_2_id=player_2
+            id=uuid.uuid4(),
+            team_player_1_id=player_1,
+            team_player_2_id=player_2,
+            created_at=datetime.now(tz=timezone.utc),
         )
         conn.add(new_team)
         return new_team
@@ -234,8 +237,18 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
 
     conn.add(match)
 
-    tm_1 = TeamMatch(id=uuid.uuid4(), team_id=team_1.id, match_id=match.id)
-    tm_2 = TeamMatch(id=uuid.uuid4(), team_id=team_2.id, match_id=match.id)
+    tm_1 = TeamMatch(
+        id=uuid.uuid4(),
+        team_id=team_1.id,
+        match_id=match.id,
+        created_at=datetime.now(tz=timezone.utc),
+    )
+    tm_2 = TeamMatch(
+        id=uuid.uuid4(),
+        team_id=team_2.id,
+        match_id=match.id,
+        created_at=datetime.now(tz=timezone.utc),
+    )
     conn.add(tm_1)
     conn.add(tm_2)
 
