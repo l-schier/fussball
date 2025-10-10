@@ -20,7 +20,10 @@ def lifespan(app: UiwizApp):
 
 
 app = UiwizApp(
-    lifespan=lifespan, title="Fussball App", page_definition_class=Layout, theme="dark"
+    lifespan=lifespan,
+    title="Fussball Leaderboard",
+    page_definition_class=Layout,
+    theme="dark",
 )
 
 app.include_router(default_route)

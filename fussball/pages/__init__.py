@@ -1,7 +1,7 @@
 page_routes = {
-    "index": "/",
-    "match": "/match",
-    "player": "/player",
+    "Home": "/",
+    "Matches": "/match",
+    "Players": "/player",
 }
 
 routes = {

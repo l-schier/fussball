@@ -67,7 +67,7 @@ def render_player(player: PlayerWithRating):
                     {
                         "data": ratings,
                         "type": "line",
-                        # "smooth": True,
+                        "smooth": True,
                     }
                 ],
             }
@@ -80,9 +80,9 @@ def render_player_list(players: list[PlayerWithRating]):
     ):
         with ui.element("thead"):
             with ui.element("tr"):
+                ui.element("th", "Ranking")
                 ui.element("th", "Name")
                 ui.element("th", "Player ID")
-                ui.element("th", "Ranking")
         with ui.element("tbody"):
             for player in players:
                 with ui.element("tr").classes(
@@ -91,6 +91,6 @@ def render_player_list(players: list[PlayerWithRating]):
                     row.attributes["onclick"] = (
                         f"window.location.href='{routes['player_detail'].format(player_id=player.id)}'"
                     )
+                    ui.element("td", str(player.ranking))
                     ui.element("td", player.name)
                     ui.element("td", str(player.id))
-                    ui.element("td", str(player.ranking))

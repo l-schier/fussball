@@ -12,6 +12,6 @@ async def view_match(match_id: str, con: Connection):
     render_match_from_id(match_id, con)
 
 
-@match_router.page(routes["match"])
+@match_router.page(routes["Matches"])
 def list_matches(con: Connection):
     render_match_list(con)
