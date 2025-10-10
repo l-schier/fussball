@@ -3,17 +3,20 @@ from uuid import UUID
 from pydantic.dataclasses import dataclass
 from pydantic import BaseModel
 
+
 class PlayerRatingInfo(BaseModel):
     player_id: UUID
     name: str
     rating_before: int | None
     rating_after: int | None
 
+
 class PlayerWithRating(BaseModel):
     id: UUID
     name: str
     ranking: int | None
     history: list[dict] = []
+
 
 @dataclass
 class MatchDetails:
@@ -25,6 +28,7 @@ class MatchDetails:
     player4_name: str | None
     team1_score: int
     team2_score: int
+
 
 class MatchSummary(BaseModel):
     matchid: UUID

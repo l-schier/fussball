@@ -2,16 +2,18 @@ from uuid import uuid4
 import uuid
 from pydantic import BaseModel
 from uiwiz import Page, PageRouter
-from fussball.database.setup import Connection
-from fussball.database.queries_players import list_players, show_player
-from fussball.pages.fragment.ui_player import render_player, render_player_list
-from fussball.database.tables import Player
+from database.setup import Connection
+from database.queries_players import list_players, show_player
+from pages.fragment.ui_player import render_player, render_player_list
+from database.tables import Player
+from datetime import datetime
 from uiwiz import ui
 from sqlalchemy import text
 
-from fussball.pages.layout import Layout
+from pages.layout import Layout
 
 player_router = PageRouter(prefix="/player")
+
 
 # custom width for player details
 class PageContentWidth(Layout):
@@ -26,11 +28,15 @@ class PlayerDTO(BaseModel):
 
 @player_router.ui("/submit/new")
 def submit_player(data: PlayerDTO, con: Connection):
-    result = con.execute(text("SELECT name FROM player WHERE name = :name"), {"name": data.name})
+    result = con.execute(
+        text("SELECT name FROM player WHERE name = :name"), {"name": data.name}
+    )
     if result.first():
         ui.toast(f"Player with name {data.name} already exists").error()
         return
-    new_player = Player(id=uuid4(), name=data.name, active=True)
+    new_player = Player(
+        id=uuid4(), name=data.name, active=True, created_at=datetime.now()
+    )
     con.add(new_player)
     con.commit()
 
@@ -39,16 +45,25 @@ def submit_player(data: PlayerDTO, con: Connection):
 
 @player_router.page("/new")
 def new_player(con: Connection):
-    with ui.form().classes("border border-base-content rounded-lg shadow-lg w-full items-center").on_submit(submit_player, swap="none"):
+    with (
+        ui.form()
+        .classes("border border-base-content rounded-lg shadow-lg w-full items-center")
+        .on_submit(submit_player, swap="none")
+    ):
         ui.label("Add new player")
-        ui.input(name="name", placeholder="Player Name").set_floating_label().classes("input")
+        ui.input(name="name", placeholder="Player Name").set_floating_label().classes(
+            "input"
+        )
         ui.button("Create Player").classes("btn-primary")
 
 
-@player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
+@player_router.page(
+    "/{player_id}", page_definition_class=PageContentWidth, title="Player Details"
+)
 def view_player(player_id: str, con: Connection, page: Page):
     player = show_player(con, uuid.UUID(player_id))
     render_player(player)
+
 
 @player_router.page("/")
 def player_list_page(con: Connection):

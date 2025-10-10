@@ -1,14 +1,15 @@
 from fastapi import Response
 from uiwiz import ui, PageRouter
-from fussball.database.setup import Connection
-from fussball.elo.upload_match import UploadMatch, UploadMatchOptional
+from database.setup import Connection
+from elo.upload_match import UploadMatch, UploadMatchOptional
 from sqlalchemy import select
 
-from fussball.database.tables import Player
-from fussball.elo.elo_calculator import process_game_data
-from fussball.pages.fragment.ui_match import render_match_from_id
+from database.tables import Player
+from elo.elo_calculator import process_game_data
+from pages.fragment.ui_match import render_match_from_id
 
 default_route = PageRouter()
+
 
 def normlize_input(match_result: UploadMatchOptional) -> UploadMatch:
     if match_result.player_1 is None and match_result.player_2 is not None:
@@ -24,9 +25,15 @@ def get_players(con: Connection):
     players = (con.execute(select(Player).filter(Player.active))).scalars().all()
     return [ui.dropdownItem(name=row.name, value=row.id) for row in players]
 
+
 def form_setup(player_options: list[ui.dropdownItem]):
-    with ui.form().on_submit(submit_match, swap="outerHTML")\
-        .classes("border border-base-content rounded-lg shadow-lg w-full items-center") as form:
+    with (
+        ui.form()
+        .on_submit(submit_match, swap="outerHTML")
+        .classes(
+            "border border-base-content rounded-lg shadow-lg w-full items-center"
+        ) as form
+    ):
         form.attributes["autocomplete"] = "off"
         ui.element("h2", "Upload Match")
 
@@ -60,14 +67,16 @@ async def submit_match(data: UploadMatchOptional, con: Connection, response: Res
 
     response.headers["HX-Push-Url"] = f"/match/{match_id}"
 
+
 @default_route.page("/")
 async def default_page(con: Connection):
     player_options = get_players(con)
     form_setup(player_options)
 
+
 def draw_player_dropdown(player_name: str, options: list[ui.dropdownItem]):
     with ui.element().classes("flex items-center justify-center gap-4 pb-2 w-full"):
-        with ui.element().classes("flex flex-col items-center gap-4 w-full"):        
+        with ui.element().classes("flex flex-col items-center gap-4 w-full"):
             ui.label(player_name)
             ui.dropdown(
                 name=player_name.lower().replace(" ", "_"),
@@ -75,6 +84,14 @@ def draw_player_dropdown(player_name: str, options: list[ui.dropdownItem]):
                 placeholder="Select player",
             )
 
+
 def draw_score_input(score_name: str):
     with ui.element().classes("flex items-center justify-center gap-4 pb-2 w-full"):
-        ui.number(name=score_name.lower().replace(" ", "_"), value=None, min=0, max=10, step=1, placeholder="0-10").classes("w-1/4")
+        ui.number(
+            name=score_name.lower().replace(" ", "_"),
+            value=None,
+            min=0,
+            max=10,
+            step=1,
+            placeholder="0-10",
+        ).classes("w-1/4")

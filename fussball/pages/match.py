@@ -1,10 +1,11 @@
 from uiwiz import PageRouter
 
-from fussball.database.setup import Connection
-from fussball.pages.fragment.ui_match import render_match_from_id, render_match_list
-from fussball.pages import routes
+from database.setup import Connection
+from pages.fragment.ui_match import render_match_from_id, render_match_list
+from pages import routes
 
 match_router = PageRouter()
+
 
 @match_router.page(routes["match_detail"])
 async def view_match(match_id: str, con: Connection):

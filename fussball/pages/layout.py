@@ -1,7 +1,7 @@
 from typing import Optional, override
 from uiwiz import PageDefinition, ui
 from uiwiz.svg.svg_handler import get_svg
-from fussball.pages import page_routes
+from pages import page_routes
 
 
 class Layout(PageDefinition):
@@ -23,7 +23,7 @@ class Layout(PageDefinition):
             with self.drawer.drawer_content():
                 self.nav(self.drawer)
                 container = ui.container(max_w=self.max_width, padding="p-4")
-            
+
             with self.drawer.drawer_side():
                 with ui.element("ul").classes("flex-none block md:hidden w-full"):
                     for page in page_routes.values():

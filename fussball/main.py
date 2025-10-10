@@ -4,10 +4,10 @@ from uiwiz import UiwizApp, ui
 from uiwiz.frame import Frame
 import logging
 import uvicorn
-from fussball.pages.default import default_route
-from fussball.pages.match import match_router as match_route
-from fussball.pages.player import player_router
-from fussball.pages.layout import Layout, page_routes
+from pages.default import default_route
+from pages.match import match_router as match_route
+from pages.player import player_router
+from pages.layout import Layout, page_routes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,7 +19,9 @@ def lifespan(app: UiwizApp):
     logger.info("Shutting down...")
 
 
-app = UiwizApp(lifespan=lifespan, title="Fussball App", page_definition_class=Layout, theme="dark")
+app = UiwizApp(
+    lifespan=lifespan, title="Fussball App", page_definition_class=Layout, theme="dark"
+)
 
 app.include_router(default_route)
 app.include_router(match_route)
@@ -49,4 +51,4 @@ async def not_found_exception_handler(request: Request, exc: Exception):
 
 
 if __name__ == "__main__":
-    uvicorn.run("fussball.main:app", host="0.0.0.0", port=8000, reload=True, workers=1)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, workers=1)

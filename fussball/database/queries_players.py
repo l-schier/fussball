@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from fussball.database.tables import Match, Player, PlayerRating
+from database.tables import Match, Player, PlayerRating
 from pydantic.dataclasses import dataclass
 
 
@@ -22,10 +22,14 @@ def list_players(con: Session) -> list[Player]:
         .scalar_subquery()
     )
 
-    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(latest_rating_subq.desc().nullslast())
+    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(
+        latest_rating_subq.desc().nullslast()
+    )
     result = con.execute(stmt)
     rows = result.fetchall()
-    return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
+    return [
+        PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows
+    ]
 
 
 def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
@@ -36,7 +40,7 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
             Player.active,
             PlayerRating.rating,
             PlayerRating.created_at,
-            Match.id.label("match_id")
+            Match.id.label("match_id"),
         )
         .select_from(Player)
         .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
@@ -45,20 +49,24 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
         .order_by(PlayerRating.created_at.desc())
         .limit(10)
     )
-    
+
     result = con.execute(stmt)
     rows = result.fetchall()
 
     if rows == []:
         return rows
-    
+
     history = []
     for row in rows:
         if row.rating is not None:
-            history.append({
-                "rating": row.rating,
-                "created_at": row.created_at,
-                "match_id": row.match_id,
-            })
+            history.append(
+                {
+                    "rating": row.rating,
+                    "created_at": row.created_at,
+                    "match_id": row.match_id,
+                }
+            )
 
-    return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)
+    return PlayerWithRating(
+        id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history
+    )
