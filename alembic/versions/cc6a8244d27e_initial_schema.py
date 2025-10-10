@@ -62,7 +62,10 @@ def upgrade() -> None:
             "losing_team_score >= 0 AND losing_team_score != 10",
             name="losing_team_score_check",
         ),
-        sa.CheckConstraint("winning_team_score = 10", name="winning_team_score_check"),
+        sa.CheckConstraint(
+            "winning_team_score > 0 AND winning_team_score <= 10",
+            name="winning_team_score_check",
+        ),
         sa.ForeignKeyConstraint(
             ["losing_team_id"],
             ["team.id"],

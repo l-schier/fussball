@@ -78,7 +78,10 @@ class Match(Base):
     losing_team_score = Column(Integer, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("winning_team_score = 10", name="winning_team_score_check"),
+        CheckConstraint(
+            "winning_team_score > 0 AND winning_team_score <= 10",
+            name="winning_team_score_check",
+        ),
         CheckConstraint(
             "losing_team_score >= 0 AND losing_team_score != 10",
             name="losing_team_score_check",
