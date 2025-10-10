@@ -26,11 +26,11 @@ class Layout(PageDefinition):
 
             with self.drawer.drawer_side():
                 with ui.element("ul").classes("flex-none block md:hidden w-full"):
-                    for page in page_routes.values():
+                    for page, route in page_routes.items():
                         with ui.element("li"):
-                            ui.link(page, page)
+                            ui.link(page, route)
                     with ui.element("li"):
-                        ui.themeSelector()
+                        ui.themeSelector(["dark", "nord"])
 
         return container
 
