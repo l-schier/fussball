@@ -36,7 +36,9 @@ if settings.database_type == "postgresql":
     #     print(f"Error initializing database: {e}")
 
 elif settings.database_type == "sqlite":
-    engine = create_engine("sqlite:///data/database.db")
+    engine = create_engine(
+        "sqlite:///data/database.db", max_overflow=30, pool_size=15, pool_recycle=600
+    )
 
 
 def get_session():
