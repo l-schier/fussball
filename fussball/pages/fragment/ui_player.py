@@ -7,6 +7,7 @@ from pages import routes
 def render_player(player: PlayerWithRating):
     ui.element("h2", player.name)
     ui.element("p", f"Ranking: {player.ranking}")
+    ui.element("h3", f"Total Matches: {len(player.history)}")
 
     with ui.element("div").classes("grid grid-cols-1 md:grid-cols-2"):
         with ui.element():
