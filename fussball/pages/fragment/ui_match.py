@@ -60,8 +60,10 @@ def render_match_list(con: Session):
         with ui.element("thead"):
             with ui.element("tr"):
                 ui.element("th", "id")
-                ui.element("th", "Winning team score")
-                ui.element("th", "Losing team score")
+                ui.element("th", "Team 1")
+                ui.element("th", "Team 1 score")
+                ui.element("th", "Team 2 score")
+                ui.element("th", "Team 2")
                 ui.element("th", "Created At")
         with ui.element("tbody"):
             for match in matches:
@@ -72,6 +74,30 @@ def render_match_list(con: Session):
                         f"window.location.href='{routes['match_detail'].format(match_id=match.id)}'"
                     )
                     ui.element("td", str(match.id))
-                    ui.element("td", str(match.winning_team_score))
-                    ui.element("td", str(match.losing_team_score))
+                    match_details = get_match_details(con, match.id)
+
+                    ui.element(
+                        "td",
+                        (
+                            f"{match_details.player1_name}"
+                            + (
+                                f" & {match_details.player2_name}"
+                                if match_details.player2_name
+                                else ""
+                            )
+                        ),
+                    )
+                    ui.element("td", str(match_details.team1_score))
+                    ui.element("td", str(match_details.team2_score))
+                    ui.element(
+                        "td",
+                        (
+                            f"{match_details.player3_name}"
+                            + (
+                                f" & {match_details.player4_name}"
+                                if match_details.player4_name
+                                else ""
+                            )
+                        ),
+                    )
                     ui.element("td", match.created_at.strftime("%Y-%m-%d %H:%M:%S"))
