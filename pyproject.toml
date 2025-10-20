@@ -26,7 +26,7 @@ dependencies = [
     "pytz==2023.3",
     "setuptools>=80.9.0",
     "sqlalchemy>2.0",
-    "uiwiz>=0.2.5a10",
+    "uiwiz>=0.2.5",
 ]
 
 [dependency-groups]

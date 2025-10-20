@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 
 [[package]]
@@ -440,7 +440,7 @@ requires-dist = [
     { name = "pytz", specifier = "==2023.3" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "sqlalchemy", specifier = ">2.0" },
-    { name = "uiwiz", specifier = ">=0.2.5a10" },
+    { name = "uiwiz", specifier = ">=0.2.5" },
 ]
 
 [package.metadata.requires-dev]
@@ -1226,7 +1226,7 @@ wheels = [
 
 [[package]]
 name = "uiwiz"
-version = "0.2.5a10"
+version = "0.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
@@ -1238,9 +1238,9 @@ dependencies = [
     { name = "starlette-authlib" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/5e/debac0bd9b74a6f5f54129306923821cf62bb81d28e1963b091657792547/uiwiz-0.2.5a10.tar.gz", hash = "sha256:9885ce7bae895548a52f976a232b1726c7129c9cc0fbdfe4dc593493756cbc0f", size = 1055797, upload-time = "2025-10-06T21:06:54.61Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/b8/42f7e71114bf6cca30cc8474f8323b94a81c040ecd9d0da6b0191bf719f1/uiwiz-0.2.5.tar.gz", hash = "sha256:1f86e026e375fb6a5b9555349cdfd1d5405c508977c2e6d635f7e9d4685131e0", size = 1055763, upload-time = "2025-10-10T18:23:21.868Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/da/acd8b3cbbe8de709da3d8eed8cee27b38fb10b11bb93fb794948af3c93e0/uiwiz-0.2.5a10-py3-none-any.whl", hash = "sha256:4217f6221eb4a4c22bf4e3dd5ee3a880ca3fd6b234890016a8600e5cd7757dcd", size = 1080220, upload-time = "2025-10-06T21:06:53.106Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/8e/17d280554f7e965f3863025f3a14e943525520bd48bacc92e88640ce746b/uiwiz-0.2.5-py3-none-any.whl", hash = "sha256:f7c262d66026cf131eb0010072ebbd848d78f336b9941cbae7d417e243a544b6", size = 1080184, upload-time = "2025-10-10T18:23:20.267Z" },
 ]
 
 [[package]]
