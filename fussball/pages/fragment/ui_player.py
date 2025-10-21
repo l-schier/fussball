@@ -76,22 +76,23 @@ def render_player(player: PlayerWithRating):
 
 
 def render_player_list(players: list[PlayerWithRating]):
-    with ui.element("table").classes(
-        "table table-zebra table-auto bg-base-300 overflow-scroll w-full whitespace-nowrap pr-4 pt-2 pb-2"
-    ):
-        with ui.element("thead"):
-            with ui.element("tr"):
-                ui.element("th", "Ranking")
-                ui.element("th", "Name")
-                ui.element("th", "Player ID")
-        with ui.element("tbody"):
-            for player in players:
-                with ui.element("tr").classes(
-                    "cursor-pointer hover:bg-base-100"
-                ) as row:
-                    row.attributes["onclick"] = (
-                        f"window.location.href='{routes['player_detail'].format(player_id=player.id)}'"
-                    )
-                    ui.element("td", str(player.ranking))
-                    ui.element("td", player.name)
-                    ui.element("td", str(player.id))
+    with ui.element().classes(ui.table._classes_container):
+        with ui.element("table").classes(
+            "table table-zebra table-auto bg-base-300 overflow-scroll w-full whitespace-nowrap pr-4 pt-2 pb-2"
+        ):
+            with ui.element("thead"):
+                with ui.element("tr"):
+                    ui.element("th", "Ranking")
+                    ui.element("th", "Name")
+                    ui.element("th", "Player ID")
+            with ui.element("tbody"):
+                for player in players:
+                    with ui.element("tr").classes(
+                        "cursor-pointer hover:bg-base-100"
+                    ) as row:
+                        row.attributes["onclick"] = (
+                            f"window.location.href='{routes['player_detail'].format(player_id=player.id)}'"
+                        )
+                        ui.element("td", str(player.ranking))
+                        ui.element("td", player.name)
+                        ui.element("td", str(player.id))
