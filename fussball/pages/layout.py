@@ -40,9 +40,7 @@ class Layout(PageDefinition):
         ):
             with ui.nav().classes("bg-base-200"):
                 with ui.element().classes("flex-1"):
-                    with ui.label(for_=drawer.drawer_toggle).classes(
-                        f"btn drawer-button {self.hide_on}:!hidden"
-                    ):
+                    with ui.label(for_=drawer.drawer_toggle).classes(f"btn drawer-button {self.hide_on}:!hidden"):
                         ui.html(get_svg("menu"))
                 with ui.element().classes(f"flex-none hidden {self.hide_on}:!block"):
                     with ui.element("ul").classes("menu menu-horizontal menu-md"):

@@ -38,12 +38,7 @@ def get_team_ratings(team1_id: int, team2_id: int, conn: Session) -> tuple[int, 
 
 
 def get_player_rating_by_id(player_id: int, conn: Session) -> int:
-    stmt = (
-        select(PlayerRating.rating)
-        .where(PlayerRating.player_id == player_id)
-        .order_by(PlayerRating.created_at.desc())
-        .limit(1)
-    )
+    stmt = select(PlayerRating.rating).where(PlayerRating.player_id == player_id).order_by(PlayerRating.created_at.desc()).limit(1)
     result = conn.execute(stmt)
     rating = result.scalar()
     if rating is None:
@@ -51,36 +46,21 @@ def get_player_rating_by_id(player_id: int, conn: Session) -> int:
     return rating
 
 
-def get_player_ratings(
-    match_result: UploadMatch, conn: Session
-) -> tuple[int, int, int, int]:
+def get_player_ratings(match_result: UploadMatch, conn: Session) -> tuple[int, int, int, int]:
     player1_rating = get_player_rating_by_id(match_result.player_1, conn)
-    player2_rating = (
-        get_player_rating_by_id(match_result.player_2, conn)
-        if match_result.player_2 is not None
-        else None
-    )
+    player2_rating = get_player_rating_by_id(match_result.player_2, conn) if match_result.player_2 is not None else None
     player3_rating = get_player_rating_by_id(match_result.player_3, conn)
-    player4_rating = (
-        get_player_rating_by_id(match_result.player_4, conn)
-        if match_result.player_4 is not None
-        else None
-    )
+    player4_rating = get_player_rating_by_id(match_result.player_4, conn) if match_result.player_4 is not None else None
 
     return player1_rating, player2_rating, player3_rating, player4_rating
 
 
-def number_of_games_team(
-    team1_id: int, team2_id: int, date, conn: Session
-) -> tuple[int, int]:
+def number_of_games_team(team1_id: int, team2_id: int, date, conn: Session) -> tuple[int, int]:
     def get_number_of_games_by_team(team_id: int, date, conn: Session) -> int:
         stmt = (
             select(func.count())
             .select_from(Match)
-            .where(
-                ((Match.winning_team_id == team_id) | (Match.losing_team_id == team_id))
-                & (Match.created_at <= date)
-            )
+            .where(((Match.winning_team_id == team_id) | (Match.losing_team_id == team_id)) & (Match.created_at <= date))
         )
         result = conn.execute(stmt)
         number_of_game_team = result.scalar() or 0
@@ -104,9 +84,7 @@ def get_number_of_games_by_player(player_id: int, date: datetime, conn: Session)
     return number_of_game_player
 
 
-def number_of_games_player(
-    match_result: UploadMatch, date: datetime, conn: Session
-) -> GamesPlayed:
+def number_of_games_player(match_result: UploadMatch, date: datetime, conn: Session) -> GamesPlayed:
     player1_games = get_number_of_games_by_player(match_result.player_1, date, conn)
     player2_games = get_number_of_games_by_player(match_result.player_2, date, conn)
     player3_games = get_number_of_games_by_player(match_result.player_3, date, conn)
@@ -127,14 +105,8 @@ def get_or_create_team(player_1: uuid.UUID, player_2: uuid.UUID, conn: Session) 
         (
             conn.execute(
                 select(Team).filter(
-                    (
-                        (Team.team_player_1_id == player_1)
-                        & (Team.team_player_2_id == player_2)
-                    )
-                    | (
-                        (Team.team_player_1_id == player_2)
-                        & (Team.team_player_2_id == player_1)
-                    )
+                    ((Team.team_player_1_id == player_1) & (Team.team_player_2_id == player_2))
+                    | ((Team.team_player_1_id == player_2) & (Team.team_player_2_id == player_1))
                 )
             )
         )
@@ -171,12 +143,8 @@ def calculate_rating_player(
     team_actual_score: int,
 ) -> int:
     k_value = 50 / (1 + games_played / 300)
-    point_factor = calculate_point_factor(
-        abs(match_result.score_team_1 - match_result.score_team_2)
-    )
-    new_rating = player_rating + k_value * point_factor * (
-        team_actual_score - player_expected_score
-    )
+    point_factor = calculate_point_factor(abs(match_result.score_team_1 - match_result.score_team_2))
+    new_rating = player_rating + k_value * point_factor * (team_actual_score - player_expected_score)
     return round(new_rating)
 
 
@@ -188,12 +156,8 @@ def calculate_rating_team(
     team_actual_score: int,
 ) -> int:
     k_value = 50 / (1 + games_played / 100)
-    point_factor = calculate_point_factor(
-        abs(match_result.score_team_1 - match_result.score_team_2)
-    )
-    new_rating = team_rating + k_value * point_factor * (
-        team_actual_score - team_expected_score
-    )
+    point_factor = calculate_point_factor(abs(match_result.score_team_1 - match_result.score_team_2))
+    new_rating = team_rating + k_value * point_factor * (team_actual_score - team_expected_score)
     return new_rating
 
 
@@ -213,25 +177,13 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     match = Match(
         id=uuid.uuid4(),
         created_at=match_result.date,
-        winning_team_id=(
-            team_1.id
-            if match_result.score_team_1 > match_result.score_team_2
-            else team_2.id
-        ),
-        losing_team_id=(
-            team_2.id
-            if match_result.score_team_1 > match_result.score_team_2
-            else team_1.id
-        ),
+        winning_team_id=(team_1.id if match_result.score_team_1 > match_result.score_team_2 else team_2.id),
+        losing_team_id=(team_2.id if match_result.score_team_1 > match_result.score_team_2 else team_1.id),
         winning_team_score=(
-            match_result.score_team_1
-            if match_result.score_team_1 > match_result.score_team_2
-            else match_result.score_team_2
+            match_result.score_team_1 if match_result.score_team_1 > match_result.score_team_2 else match_result.score_team_2
         ),
         losing_team_score=(
-            match_result.score_team_2
-            if match_result.score_team_1 > match_result.score_team_2
-            else match_result.score_team_1
+            match_result.score_team_2 if match_result.score_team_1 > match_result.score_team_2 else match_result.score_team_1
         ),
     )
 
@@ -263,9 +215,7 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     )
 
     # Call the get_player_ratings function inside the loop
-    player1_rating, player2_rating, player3_rating, player4_rating = get_player_ratings(
-        match_result, conn
-    )
+    player1_rating, player2_rating, player3_rating, player4_rating = get_player_ratings(match_result, conn)
 
     player_ratings_versus_p12 = []
     player_ratings_versus_p12.append(player3_rating)
@@ -286,9 +236,7 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     t1_expected_rating.append(player1_expected_score)
     player2_expected_score = None
     if player2_rating is not None:
-        player2_expected_score = expected_score(
-            player2_rating, player_ratings_versus_p12
-        )
+        player2_expected_score = expected_score(player2_rating, player_ratings_versus_p12)
         t1_expected_rating.append(player2_expected_score)
 
     t2_expected_rating = []
@@ -296,21 +244,15 @@ def process_game_data(match_result: UploadMatch, conn: Session) -> uuid.UUID:
     t2_expected_rating.append(player3_expected_score)
     player4_expected_score = None
     if player4_rating is not None:
-        player4_expected_score = expected_score(
-            player4_rating, player_ratings_versus_p34
-        )
+        player4_expected_score = expected_score(player4_rating, player_ratings_versus_p34)
         t2_expected_rating.append(player4_expected_score)
 
     # Calculate the expected scores for the teams
     team1_expected_score = sum(t1_expected_rating) / len(t1_expected_rating)
     team2_expected_score = sum(t2_expected_rating) / len(t2_expected_rating)
 
-    team1_actual_score = (
-        1 if match_result.score_team_1 > match_result.score_team_2 else 0
-    )
-    team2_actual_score = (
-        1 if match_result.score_team_2 > match_result.score_team_1 else 0
-    )
+    team1_actual_score = 1 if match_result.score_team_1 > match_result.score_team_2 else 0
+    team2_actual_score = 1 if match_result.score_team_2 > match_result.score_team_1 else 0
 
     # Calculate the new Elo ratings for each player
     player1_new_rating = calculate_rating_player(

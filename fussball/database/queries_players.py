@@ -22,14 +22,10 @@ def list_players(con: Session) -> list[Player]:
         .scalar_subquery()
     )
 
-    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(
-        latest_rating_subq.desc().nullslast()
-    )
+    stmt = select(Player, latest_rating_subq.label("latest_rating")).order_by(latest_rating_subq.desc().nullslast())
     result = con.execute(stmt)
     rows = result.fetchall()
-    return [
-        PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows
-    ]
+    return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
 
 
 def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
@@ -67,6 +63,4 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
                 }
             )
 
-    return PlayerWithRating(
-        id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history
-    )
+    return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)

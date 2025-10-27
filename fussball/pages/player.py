@@ -28,9 +28,7 @@ class PlayerDTO(BaseModel):
 
 @player_router.ui("/submit/new")
 def submit_player(data: PlayerDTO, con: Connection):
-    result = con.execute(
-        text("SELECT name FROM player WHERE name = :name"), {"name": data.name}
-    )
+    result = con.execute(text("SELECT name FROM player WHERE name = :name"), {"name": data.name})
     if result.first():
         ui.toast(f"Player with name {data.name} already exists").error()
         return
@@ -48,21 +46,13 @@ def submit_player(data: PlayerDTO, con: Connection):
 
 @player_router.page("/new")
 def new_player(con: Connection):
-    with (
-        ui.form()
-        .classes("border border-base-content rounded-lg shadow-lg w-full items-center")
-        .on_submit(submit_player, swap="none")
-    ):
+    with ui.form().classes("border border-base-content rounded-lg shadow-lg w-full items-center").on_submit(submit_player, swap="none"):
         ui.label("Add new player")
-        ui.input(name="name", placeholder="Player Name").set_floating_label().classes(
-            "input"
-        )
+        ui.input(name="name", placeholder="Player Name").set_floating_label().classes("input")
         ui.button("Create Player").classes("btn-primary")
 
 
-@player_router.page(
-    "/{player_id}", page_definition_class=PageContentWidth, title="Player Details"
-)
+@player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
 def view_player(player_id: str, con: Connection, page: Page):
     player = show_player(con, uuid.UUID(player_id))
     render_player(player)

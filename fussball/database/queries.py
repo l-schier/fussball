@@ -45,9 +45,7 @@ def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
     return MatchDetails(*out)
 
 
-def get_player_ratings_after_match(
-    con: Session, match_id: UUID
-) -> list[PlayerRatingInfo]:
+def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerRatingInfo]:
     # Get the last match
     # Get the last match
     wt = aliased(Team, name="wt")
@@ -88,9 +86,7 @@ def get_player_ratings_after_match(
             pr.player_id.label("player_id"),
             pr.rating.label("rating"),
             pr.created_at.label("created_at"),
-            func.row_number()
-            .over(partition_by=pr.player_id, order_by=pr.created_at.desc())
-            .label("rn"),
+            func.row_number().over(partition_by=pr.player_id, order_by=pr.created_at.desc()).label("rn"),
         )
         .where(
             pr.match_id == match_id,
@@ -105,9 +101,7 @@ def get_player_ratings_after_match(
             pr.player_id.label("player_id"),
             pr.rating.label("rating"),
             pr.created_at.label("created_at"),
-            func.row_number()
-            .over(partition_by=pr.player_id, order_by=pr.created_at.desc())
-            .label("rn"),
+            func.row_number().over(partition_by=pr.player_id, order_by=pr.created_at.desc()).label("rn"),
         )
         .where(
             pr.player_id.in_(select(players_union.c.player_id)),
