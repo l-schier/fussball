@@ -30,9 +30,7 @@ def form_setup(player_options: list[ui.dropdownItem]):
     with (
         ui.form()
         .on_submit(submit_match, swap="outerHTML")
-        .classes(
-            "border border-base-content rounded-lg shadow-lg w-full items-center"
-        ) as form
+        .classes("border border-base-content rounded-lg shadow-lg w-full items-center") as form
     ):
         form.attributes["autocomplete"] = "off"
         ui.element("h2", "Upload Match")
