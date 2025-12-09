@@ -1,5 +1,5 @@
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from database.tables import Match, Player, PlayerRating
 from pydantic.dataclasses import dataclass
@@ -36,14 +36,13 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
             Player.active,
             PlayerRating.rating,
             PlayerRating.created_at,
-            Match.id.label("match_id"),
+            Match.id.label("match_id")
         )
         .select_from(Player)
         .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
         .join(Match, PlayerRating.match_id == Match.id, isouter=True)
         .where(Player.id == player_id)
         .order_by(PlayerRating.created_at.desc())
-        .limit(10)
     )
 
     result = con.execute(stmt)
@@ -64,3 +63,20 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
             )
 
     return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)
+
+def get_player_matches(con: Session, player_id: UUID) -> int:
+    stmt = (
+        select(
+            func.count()
+        )
+        .select_from(Player)
+        .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
+        .join(Match, PlayerRating.match_id == Match.id, isouter=True)
+        .where(Player.id == player_id)
+        .order_by(PlayerRating.created_at.desc())
+    )
+
+    result = con.execute(stmt)
+    rows = result.fetchone()
+
+    return rows[0]

@@ -3,7 +3,7 @@ import uuid
 from pydantic import BaseModel
 from uiwiz import Page, PageRouter
 from database.setup import Connection
-from database.queries_players import list_players, show_player
+from database.queries_players import get_player_matches, list_players, show_player
 from pages.fragment.ui_player import render_player, render_player_list
 from database.tables import Player
 from datetime import datetime, timezone
@@ -55,7 +55,8 @@ def new_player(con: Connection):
 @player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
 def view_player(player_id: str, con: Connection, page: Page):
     player = show_player(con, uuid.UUID(player_id))
-    render_player(player)
+    player_match_count = get_player_matches(con, uuid.UUID(player_id))
+    render_player(player, player_match_count)
 
 
 @player_router.page("/")
