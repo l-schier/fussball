@@ -43,6 +43,7 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
         .join(Match, PlayerRating.match_id == Match.id, isouter=True)
         .where(Player.id == player_id)
         .order_by(PlayerRating.created_at.desc())
+        .limit(10)
     )
 
     result = con.execute(stmt)
