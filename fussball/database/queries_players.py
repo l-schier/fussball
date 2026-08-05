@@ -81,3 +81,39 @@ def get_player_matches(con: Session, player_id: UUID) -> int:
     rows = result.fetchone()
 
     return rows[0]
+
+
+def count_player_ratings(con: Session, player_id: UUID) -> int:
+    stmt = select(func.count()).select_from(PlayerRating).where(PlayerRating.player_id == player_id)
+    result = con.execute(stmt)
+    row = result.fetchone()
+    return row[0] if row else 0
+
+
+def get_player_ratings_page(con: Session, player_id: UUID, page: int, page_size: int = 10) -> list[dict]:
+    safe_page = max(page, 1)
+    offset = (safe_page - 1) * page_size
+
+    stmt = (
+        select(
+            PlayerRating.rating,
+            PlayerRating.created_at,
+            Match.id.label("match_id"),
+        )
+        .select_from(PlayerRating)
+        .join(Match, PlayerRating.match_id == Match.id, isouter=True)
+        .where(PlayerRating.player_id == player_id)
+        .order_by(PlayerRating.created_at.desc())
+        .offset(offset)
+        .limit(page_size + 1)
+    )
+
+    rows = con.execute(stmt).fetchall()
+    return [
+        {
+            "rating": row.rating,
+            "created_at": row.created_at,
+            "match_id": row.match_id,
+        }
+        for row in rows
+    ]

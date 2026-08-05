@@ -1,10 +1,17 @@
 from uuid import uuid4
 import uuid
+import math
 from pydantic import BaseModel
 from uiwiz import Page, PageRouter
 from database.setup import Connection
-from database.queries_players import get_player_matches, list_players, show_player
-from pages.fragment.ui_player import render_player, render_player_list
+from database.queries_players import (
+    count_player_ratings,
+    get_player_matches,
+    get_player_ratings_page,
+    list_players,
+    show_player,
+)
+from pages.fragment.ui_player import render_player, render_player_list, render_player_ratings_table_content
 from database.tables import Player
 from datetime import datetime, timezone
 from uiwiz import ui
@@ -54,9 +61,32 @@ def new_player(con: Connection):
 
 @player_router.page("/{player_id}", page_definition_class=PageContentWidth, title="Player Details")
 def view_player(player_id: str, con: Connection, page: Page):
-    player = show_player(con, uuid.UUID(player_id))
-    player_match_count = get_player_matches(con, uuid.UUID(player_id))
-    render_player(player, player_match_count)
+    player_uuid = uuid.UUID(player_id)
+    player = show_player(con, player_uuid)
+    player_match_count = get_player_matches(con, player_uuid)
+    total_ratings = count_player_ratings(con, player_uuid)
+    total_pages = max(1, math.ceil(total_ratings / 10))
+    ratings = get_player_ratings_page(con, player_uuid, page=1, page_size=10)
+
+    render_player(player, player_match_count, player_uuid, ratings, total_pages, player_ratings_page)
+
+
+@player_router.ui("/{player_id}/ratings/{page}")
+def player_ratings_page(player_id: str, page: int, con: Connection):
+    player_uuid = uuid.UUID(player_id)
+    safe_page = max(page, 1)
+    total_ratings = count_player_ratings(con, player_uuid)
+    total_pages = max(1, math.ceil(total_ratings / 10))
+    safe_page = min(safe_page, total_pages)
+    ratings = get_player_ratings_page(con, player_uuid, page=safe_page, page_size=10)
+
+    render_player_ratings_table_content(
+        player_id=player_uuid,
+        ratings=ratings,
+        page=safe_page,
+        total_pages=total_pages,
+        on_page_change=player_ratings_page,
+    )
 
 
 @player_router.page("/")
