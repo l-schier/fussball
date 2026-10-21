@@ -4,12 +4,12 @@ import json
 import shutil
 import subprocess
 import time
-import urllib.error
-import urllib.request
 import uuid
 from collections.abc import Iterator
 
 import pytest
+
+from tests.health_polling import poll_health_endpoint
 
 DOCKER = shutil.which("docker")
 IMAGE = f"fussball-container-test:{uuid.uuid4().hex}"
@@ -29,14 +29,9 @@ def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 def _wait_for_health(container: str, timeout: float = 60) -> str:
     port = docker("port", container, "8000/tcp").stdout.strip().rsplit(":", 1)[-1]
     url = f"http://127.0.0.1:{port}/health"
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as response:
-                assert response.status == 200
-                return response.read().decode()
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
-            time.sleep(0.25)
+    body = poll_health_endpoint(url, timeout=timeout, interval=0.25)
+    if body is not None:
+        return body.decode()
     logs = docker("logs", container, check=False).stdout
     raise AssertionError(f"Container did not become healthy. Logs:\n{logs}")
 

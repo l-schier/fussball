@@ -4,10 +4,9 @@ import os
 import socket
 import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
+
+from tests.health_polling import poll_health_endpoint
 
 
 def test_production_server_serves_the_health_endpoint() -> None:
@@ -27,22 +26,23 @@ def test_production_server_serves_the_health_endpoint() -> None:
         stderr=subprocess.PIPE,
         text=True,
     )
+
+    def ensure_server_is_running() -> None:
+        if server.poll() is not None:
+            _, error = server.communicate()
+            raise AssertionError(f"Production server exited before becoming healthy:\n{error}")
+
     try:
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            if server.poll() is not None:
-                _, error = server.communicate()
-                raise AssertionError(f"Production server exited before becoming healthy:\n{error}")
-
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1) as response:
-                    assert response.status == 200
-                    assert response.read() == b'{"status":"ok"}'
-                    return
-            except (urllib.error.URLError, TimeoutError, ConnectionError):
-                time.sleep(0.1)
-
-        raise AssertionError("Production server did not respond at /health")
+        body = poll_health_endpoint(
+            f"http://127.0.0.1:{port}/health",
+            timeout=15,
+            interval=0.1,
+            request_timeout=1,
+            before_request=ensure_server_is_running,
+        )
+        if body is None:
+            raise AssertionError("Production server did not respond at /health")
+        assert body == b'{"status":"ok"}'
     finally:
         if server.poll() is None:
             server.terminate()
