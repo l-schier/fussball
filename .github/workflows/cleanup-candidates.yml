@@ -1,0 +1,33 @@
+name: Clean up candidate images
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions: {}
+
+jobs:
+  delete-candidate-images:
+    name: Delete closed pull request candidate images
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out trusted base-branch cleanup code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
+
+      - name: Delete this pull request's candidate package versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_OWNER_TYPE: ${{ github.event.repository.owner.type }}
+          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python .github/scripts/cleanup_candidate_images.py
