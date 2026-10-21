@@ -31,13 +31,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "black>=25.9.0",
     "pytest>=8.4.2",
+    "ruff>=0.17.1",
     "testcontainers>=4.13.1",
 ]
 
 [tool.ruff]
-line-length=120
-
-[tool.black]
 line-length=120
