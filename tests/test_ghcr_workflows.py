@@ -16,7 +16,10 @@ def test_production_image_publishes_latest_and_commit_tags_on_main() -> None:
 
     assert workflow["on"]["push"]["branches"] == ["main"]
     publish = workflow["jobs"]["publish-production"]
+    assert publish["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     assert publish["permissions"] == {"contents": "read", "packages": "write"}
+    checkout = next(step for step in publish["steps"] if step.get("uses", "").startswith("actions/checkout@"))
+    assert checkout["with"]["persist-credentials"] == "false"
     build = next(step for step in publish["steps"] if step.get("id") == "build")
     assert "latest" in build["with"]["tags"]
     assert "github.sha" in build["with"]["tags"]
@@ -26,6 +29,7 @@ def test_production_image_publishes_latest_and_commit_tags_on_main() -> None:
 def test_candidate_image_is_one_shot_and_limited_to_same_repository_pull_requests() -> None:
     workflow = yaml.load((WORKFLOWS / "publish-images.yml").read_text(), Loader=yaml.BaseLoader)
 
+    assert workflow["on"]["pull_request"]["branches"] == ["main"]
     assert workflow["on"]["pull_request"]["types"] == ["labeled"]
     assert "pull_request_target" not in workflow["on"]
     candidate = workflow["jobs"]["publish-candidate"]
