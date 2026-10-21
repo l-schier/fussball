@@ -1,8 +1,11 @@
+from collections.abc import Sequence
 from uuid import UUID
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+
 from database.tables import Match, Player, PlayerRating
 from pydantic.dataclasses import dataclass
+from sqlalchemy import Row, func, select
+from sqlalchemy.orm import Session
+from ty_extensions._internal import Unknown
 
 
 @dataclass
@@ -10,10 +13,10 @@ class PlayerWithRating:
     id: UUID
     name: str
     ranking: int | None
-    history: list[dict] = None
+    history: list[dict] | None = None
 
 
-def list_players(con: Session) -> list[Player]:
+def list_players(con: Session) -> list[PlayerWithRating]:
     latest_rating_subq = (
         select(PlayerRating.rating)
         .where(Player.id == PlayerRating.player_id)
@@ -28,7 +31,7 @@ def list_players(con: Session) -> list[Player]:
     return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
 
 
-def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
+def show_player(con: Session, player_id: UUID) -> PlayerWithRating | Sequence[Row[*tuple[Unknown, ...]]]:
     stmt = (
         select(
             Player.id,
@@ -36,7 +39,7 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
             Player.active,
             PlayerRating.rating,
             PlayerRating.created_at,
-            Match.id.label("match_id")
+            Match.id.label("match_id"),
         )
         .select_from(Player)
         .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
@@ -65,11 +68,10 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating:
 
     return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)
 
-def get_player_matches(con: Session, player_id: UUID) -> int:
+
+def get_player_matches(con: Session, player_id: UUID) -> int | None:
     stmt = (
-        select(
-            func.count()
-        )
+        select(func.count())
         .select_from(Player)
         .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
         .join(Match, PlayerRating.match_id == Match.id, isouter=True)
@@ -79,6 +81,9 @@ def get_player_matches(con: Session, player_id: UUID) -> int:
 
     result = con.execute(stmt)
     rows = result.fetchone()
+
+    if rows is None:
+        return None
 
     return rows[0]
 
