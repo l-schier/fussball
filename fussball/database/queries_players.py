@@ -1,11 +1,11 @@
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from database.tables import Match, Player, PlayerRating
 from pydantic.dataclasses import dataclass
 from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
-from ty_extensions._internal import Unknown
 
 
 @dataclass
@@ -31,7 +31,7 @@ def list_players(con: Session) -> list[PlayerWithRating]:
     return [PlayerWithRating(id=row[0].id, name=row[0].name, ranking=row[1]) for row in rows]
 
 
-def show_player(con: Session, player_id: UUID) -> PlayerWithRating | Sequence[Row[*tuple[Unknown, ...]]]:
+def show_player(con: Session, player_id: UUID) -> PlayerWithRating | Sequence[Row[*tuple[Any, ...]]]:
     stmt = (
         select(
             Player.id,
