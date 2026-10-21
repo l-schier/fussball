@@ -12,6 +12,7 @@ dependencies = [
     "dash-core-components==2.0.0",
     "dash-html-components==2.0.0",
     "dash-table==5.0.0",
+    "fastapi>=0.115.0",
     "flask==2.2.2",
     "flask-session==0.4.0",
     "greenlet>=3.2.4",
@@ -24,20 +25,20 @@ dependencies = [
     "pydantic-settings>=2.10.1",
     "python-dateutil==2.8.2",
     "pytz==2023.3",
-    "setuptools>=80.9.0",
+    "setuptools>=80.9.0,<81",
     "sqlalchemy>2.0",
     "uiwiz>=0.2.5",
+    "uvicorn[standard]>=0.30.0",
+    "werkzeug<3",
 ]
 
 [dependency-groups]
 dev = [
-    "black>=25.9.0",
+    "PyYAML>=6.0",
     "pytest>=8.4.2",
+    "ruff>=0.17.1",
     "testcontainers>=4.13.1",
 ]
 
 [tool.ruff]
-line-length=120
-
-[tool.black]
 line-length=120

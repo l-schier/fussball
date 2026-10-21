@@ -1,13 +1,14 @@
+import logging
+
+import uvicorn
 from fastapi import Request
 from fastapi.responses import HTMLResponse
-from uiwiz import UiwizApp, ui
-from uiwiz.frame import Frame
-import logging
-import uvicorn
 from pages.default import default_route
+from pages.layout import Layout, page_routes
 from pages.match import match_router as match_route
 from pages.player import player_router
-from pages.layout import Layout, page_routes
+from uiwiz import UiwizApp, ui
+from uiwiz.frame import Frame
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ def lifespan(app: UiwizApp):
 app = UiwizApp(
     lifespan=lifespan,
     title="Fussball Leaderboard",
-    page_definition_class=Layout,
+    page_definition_class=Layout,  # ty: ignore[invalid-argument-type]
     theme="dark",
 )
 
@@ -45,7 +46,7 @@ async def not_found():
 
 @app.exception_handler(404)
 async def not_found_exception_handler(request: Request, exc: Exception):
-    await app.page_definition_class().render(not_found, request, title="Not Found")
+    await app.page_definition_class().render(not_found, request, title="Not Found")  # ty: ignore[call-non-callable]
     return HTMLResponse(
         content=Frame.get_stack().render(),
         status_code=404,

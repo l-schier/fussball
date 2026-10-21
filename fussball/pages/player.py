@@ -1,9 +1,8 @@
-from uuid import uuid4
-import uuid
 import math
-from pydantic import BaseModel
-from uiwiz import Page, PageRouter
-from database.setup import Connection
+import uuid
+from datetime import UTC, datetime
+from uuid import uuid4
+
 from database.queries_players import (
     count_player_ratings,
     get_player_matches,
@@ -11,12 +10,13 @@ from database.queries_players import (
     list_players,
     show_player,
 )
-from pages.fragment.ui_player import render_player, render_player_list, render_player_ratings_table_content
+from database.setup import Connection
 from database.tables import Player
-from datetime import datetime, timezone
-from uiwiz import ui
+from pydantic import BaseModel
 from sqlalchemy import text
+from uiwiz import Page, PageRouter, ui
 
+from pages.fragment.ui_player import render_player, render_player_list, render_player_ratings_table_content
 from pages.layout import Layout
 
 player_router = PageRouter(prefix="/player")
@@ -43,7 +43,7 @@ def submit_player(data: PlayerDTO, con: Connection):
         id=uuid4(),
         name=data.name,
         active=True,
-        created_at=datetime.now(tz=timezone.utc),
+        created_at=datetime.now(tz=UTC),
     )
     con.add(new_player)
     con.commit()
@@ -53,7 +53,11 @@ def submit_player(data: PlayerDTO, con: Connection):
 
 @player_router.page("/new")
 def new_player(con: Connection):
-    with ui.form().classes("border border-base-content rounded-lg shadow-lg w-full items-center").on_submit(submit_player, swap="none"):
+    with (
+        ui.form()
+        .classes("border border-base-content rounded-lg shadow-lg w-full items-center")
+        .on_submit(submit_player, swap="none")
+    ):
         ui.label("Add new player")
         ui.input(name="name", placeholder="Player Name").set_floating_label().classes("input")
         ui.button("Create Player").classes("btn-primary")
@@ -68,7 +72,7 @@ def view_player(player_id: str, con: Connection, page: Page):
     total_pages = max(1, math.ceil(total_ratings / 10))
     ratings = get_player_ratings_page(con, player_uuid, page=1, page_size=10)
 
-    render_player(player, player_match_count, player_uuid, ratings, total_pages, player_ratings_page)
+    render_player(player, player_match_count, player_uuid, ratings, total_pages, player_ratings_page)  # ty: ignore[invalid-argument-type]
 
 
 @player_router.ui("/{player_id}/ratings/{page}")

@@ -86,6 +86,11 @@ To use the system, follow these steps:
 5. Continuously feed match data into the system to keep player ratings up-to-date.
 6. Take a look at the data vizualiation and the different players metrics in the app.
 
+## Deployment
+
+For the production Dockge stack, manual image updates, SQLite backup and
+restore, and migration operations, see the [deployment guide](docs/deployment.md).
+
 The baby-foot Elo rating system allows for fair player performance evaluation and fosters a competitive environment for players of all skill levels.
 
 ## Authors
