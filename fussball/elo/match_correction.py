@@ -4,14 +4,11 @@ from uuid import UUID
 
 from database.tables import Match, Player, Team, TeamMatch
 from elo.elo_calculator import get_or_create_team
+from elo.match_errors import MatchNotFoundError
 from elo.rating_replay import replay_rating_history
 from elo.upload_match import MatchCorrection
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-
-class MatchNotFoundError(LookupError):
-    pass
 
 
 class InvalidPlayerSelectionError(ValueError):
