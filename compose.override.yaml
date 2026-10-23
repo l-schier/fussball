@@ -1,0 +1,8 @@
+# Compose loads this override for local runs. Deploy only compose.yaml to Dockge.
+services:
+  app:
+    image: fussball:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: build
