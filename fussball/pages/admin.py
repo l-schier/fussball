@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from uiwiz import PageRouter, ui
 from uiwiz.frame import Frame
 
+from pages import routes
+
 admin_router = PageRouter()
 
 
@@ -46,5 +48,5 @@ async def sign_in(data: AdminCredentials, request: Request, response: Response):
 
     request.session.clear()
     request.session["admin_authenticated"] = True
-    response.headers["HX-Push-Url"] = "/match"
+    response.headers["HX-Redirect"] = routes["Matches"]
     ui.toast("Signed in as administrator").success()

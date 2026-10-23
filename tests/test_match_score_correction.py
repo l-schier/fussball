@@ -137,9 +137,13 @@ def test_administrator_can_sign_in_with_deployment_credentials(configured_site):
         json={"username": "admin", "password": "correct horse battery staple"},
     )
     assert accepted.status_code == 200
-    assert accepted.headers["HX-Push-Url"] == "/match"
+    assert accepted.headers["HX-Redirect"] == "/match"
+    assert "HX-Push-Url" not in accepted.headers
     assert "Signed in as administrator" in accepted.text
     assert "fussball_admin" in client.cookies
+    matches_page = client.get(accepted.headers["HX-Redirect"])
+    assert matches_page.status_code == 200
+    assert "Team 1 score" in matches_page.text
     assert "Edit match" in client.get(f"/match/{match_id}").text
 
     protected_response = client.post(f"/match/{match_id}/edit", json={"score_team_1": 8, "score_team_2": 3})
@@ -158,13 +162,22 @@ def test_authenticated_administrator_corrects_both_scores_without_changing_match
     edit_page = client.get(f"/match/{match_id}/edit")
     assert edit_page.status_code == 200
     assert "Edit match scores" in edit_page.text
+    assert f'hx-post="/match/{match_id}/edit"' in edit_page.text
     assert 'name="score_team_1"' in edit_page.text
     assert 'value="5"' in edit_page.text
     assert 'value="2"' in edit_page.text
 
     response = client.post(
         f"/match/{match_id}/edit",
-        json={"score_team_1": 2, "score_team_2": 8},
+        json={
+            "date": "2024-01-02T12:00:00",
+            "player_1": str(uuid.UUID(int=1)),
+            "player_2": str(uuid.UUID(int=2)),
+            "score_team_1": 2,
+            "player_3": str(uuid.UUID(int=3)),
+            "player_4": str(uuid.UUID(int=4)),
+            "score_team_2": 8,
+        },
     )
 
     assert response.status_code == 200
@@ -860,6 +873,11 @@ def test_administrator_corrects_played_at_and_replays_history(configured_site, c
     assert 'name="date"' in edit_page.text
     assert "Played at (UTC)" in edit_page.text
     assert 'value="2024-01-02T12:00:00"' in edit_page.text
+    assert 'step="1"' in edit_page.text
+    assert "border border-base-content rounded-lg shadow-lg w-full items-center" in edit_page.text
+    assert "flex flex-col items-center justify-center gap-4 pb-2 w-full" in edit_page.text
+    assert "Team 1 score" in edit_page.text
+    assert "Team 2 score" in edit_page.text
 
     response = client.post(
         f"/match/{match_id}/edit",

@@ -30,7 +30,7 @@ def render_match(
     ui.element("p", f"Team 1 Score: {match_details.team1_score}")
     ui.element("p", f"Team 2 Score: {match_details.team2_score}")
     if is_admin:
-        ui.link("Edit match", f"/match/{match_details.matchid}/edit")
+        ui.link("Edit match", routes["match_edit"].format(match_id=match_details.matchid))
     elif admin_enabled:
         ui.link("Administrator sign in", "/admin/login")
     with ui.element().classes(ui.table._classes_container):
