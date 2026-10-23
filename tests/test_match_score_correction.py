@@ -122,6 +122,11 @@ def configured_site():
     engine.dispose()
 
 
+def _sign_in_as_admin(client: TestClient) -> None:
+    response = client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    assert response.status_code == 200
+
+
 def test_administrator_can_sign_in_with_deployment_credentials(configured_site):
     client, _, _, match_id, _, *_ = configured_site
 
@@ -923,7 +928,7 @@ def test_administrator_can_review_and_cancel_match_removal_without_changes(confi
     assert public_detail.status_code == 200
     assert "Remove match" not in public_detail.text
 
-    client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    _sign_in_as_admin(client)
     admin_detail = client.get(f"/match/{match_id}")
     assert f'href="/match/{match_id}/remove"' in admin_detail.text
 
@@ -1020,7 +1025,7 @@ def test_administrator_removes_match_and_replays_remaining_ratings(configured_si
     client, engine, tables, match_id, team_ids, *_ = configured_site
     following_match_id = _seed_following_match(engine, tables, team_ids)
 
-    client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    _sign_in_as_admin(client)
     response = client.post(f"/match/{match_id}/remove", json={})
 
     assert response.status_code == 200
@@ -1126,7 +1131,7 @@ def test_match_removal_rolls_back_if_rating_replay_fails(configured_site):
             "BEGIN SELECT RAISE(ABORT, 'simulated rating persistence failure'); END"
         )
 
-    client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    _sign_in_as_admin(client)
     response = client.post(f"/match/{match_id}/remove", json={})
 
     assert response.status_code == 500
@@ -1179,7 +1184,7 @@ def test_match_removal_rolls_back_if_rating_replay_fails(configured_site):
 def test_removing_missing_match_returns_not_found_without_changes(configured_site):
     client, engine, tables, match_id, *_ = configured_site
     missing_match_id = uuid.UUID(int=999)
-    client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    _sign_in_as_admin(client)
 
     assert client.get(f"/match/{missing_match_id}/remove").status_code == 404
     assert client.post(f"/match/{missing_match_id}/remove", json={}).status_code == 404

@@ -10,6 +10,12 @@ from sqlalchemy.orm import Session
 from uiwiz import ui
 
 
+def format_team_label(player_1_name: str, player_2_name: str | None) -> str:
+    if player_2_name is None:
+        return player_1_name
+    return f"{player_1_name} & {player_2_name}"
+
+
 def render_match_from_id(match_id: str, con: Session, *, admin_enabled: bool = False, is_admin: bool = False):
     match_details = get_match_details(con, match_id)
     player_ratings: list[PlayerRatingInfo] = get_player_ratings_after_match(con, match_id)
@@ -77,18 +83,12 @@ def render_match_list(con: Session):
 
                         ui.element(
                             "td",
-                            (
-                                f"{match_details.player1_name}"
-                                + (f" & {match_details.player2_name}" if match_details.player2_name else "")
-                            ),
+                            format_team_label(match_details.player1_name, match_details.player2_name),
                         )
                         ui.element("td", str(match_details.team1_score))
                         ui.element("td", str(match_details.team2_score))
                         ui.element(
                             "td",
-                            (
-                                f"{match_details.player3_name}"
-                                + (f" & {match_details.player4_name}" if match_details.player4_name else "")
-                            ),
+                            format_team_label(match_details.player3_name, match_details.player4_name),
                         )
                         ui.element("td", match.created_at.strftime("%Y-%m-%d %H:%M:%S"))

@@ -16,7 +16,7 @@ from sqlalchemy import or_, select
 from uiwiz import PageRouter, ui
 
 from pages import routes
-from pages.fragment.ui_match import render_match_from_id, render_match_list
+from pages.fragment.ui_match import format_team_label, render_match_from_id, render_match_list
 
 match_router = PageRouter()
 
@@ -96,8 +96,8 @@ def list_matches(con: Connection):
 
 
 def render_match_removal_confirmation(match_details: MatchDetails) -> None:
-    team_1 = match_details.player1_name + (f" & {match_details.player2_name}" if match_details.player2_name else "")
-    team_2 = match_details.player3_name + (f" & {match_details.player4_name}" if match_details.player4_name else "")
+    team_1 = format_team_label(match_details.player1_name, match_details.player2_name)
+    team_2 = format_team_label(match_details.player3_name, match_details.player4_name)
     with ui.form().on_submit(routes["match_remove"].format(match_id=match_details.matchid), swap="outerHTML"):
         ui.element("h2", "Permanently remove this match?")
         ui.element("p", f"Match: {team_1} {match_details.team1_score} – {match_details.team2_score} {team_2}")
