@@ -4,6 +4,9 @@ from uiwiz.svg.svg_handler import get_svg
 from pages import page_routes
 
 
+ISSUE_REPORT_URL = "https://github.com/l-schier/fussball/issues/new"
+
+
 class Layout(PageDefinition):
     def __init__(self) -> None:
         """Layout
@@ -29,10 +32,17 @@ class Layout(PageDefinition):
                     for page, route in page_routes.items():
                         with ui.element("li"):
                             ui.link(page, route)
+                    self.report_issue_link()
                     with ui.element("li"):
                         ui.themeSelector(["dark", "nord"])
 
         return container
+
+    def report_issue_link(self) -> None:
+        with ui.element("li"):
+            link = ui.link("Report an issue", ISSUE_REPORT_URL)
+            link.attributes["target"] = "_blank"
+            link.attributes["rel"] = "noopener noreferrer"
 
     def nav(self, drawer):
         with ui.element().classes(
@@ -47,5 +57,6 @@ class Layout(PageDefinition):
                         for page, route in page_routes.items():
                             with ui.element("li"):
                                 ui.link(page, route)
+                        self.report_issue_link()
                         with ui.element("li"):
                             ui.themeSelector(["dark", "nord"])
