@@ -28,6 +28,8 @@ def test_local_compose_override_builds_a_local_image() -> None:
     assert app["image"] == "fussball:local"
     assert app["build"] == {"context": ".", "dockerfile": "Dockerfile"}
     assert app["pull_policy"] == "build"
+    assert app["volumes"] == ["fussball-data-dev:/app/data"]
+    assert compose["volumes"]["fussball-data-dev"]["name"] == "fussball-data-dev"
 
 
 def test_compose_renders_selected_image_tag_and_stable_volume_name() -> None:

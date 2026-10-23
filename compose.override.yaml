@@ -6,3 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
     pull_policy: build
+    volumes:
+      - fussball-data-dev:/app/data
+
+volumes:
+  fussball-data-dev:
+    name: fussball-data-dev
+    driver: local
