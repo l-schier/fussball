@@ -21,6 +21,8 @@ class PlayerWithRating(BaseModel):
 
 @dataclass
 class MatchDetails:
+    """Match details in display order: winning side first, then losing side."""
+
     matchid: UUID
     created_at: datetime
     player1_name: str
@@ -29,6 +31,10 @@ class MatchDetails:
     player4_name: str | None
     team1_score: int
     team2_score: int
+    player1_id: UUID
+    player2_id: UUID | None
+    player3_id: UUID
+    player4_id: UUID | None
 
 
 class MatchSummary(BaseModel):

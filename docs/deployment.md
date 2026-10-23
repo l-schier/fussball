@@ -22,6 +22,28 @@ when to pull and deploy an image in Dockge.
 4. Save and deploy the stack in Dockge. The app listens on port `8000`; make it
    reachable through the existing VM/network setup as appropriate.
 
+## Configure administrator score correction
+
+Administrator sign-in is optional. To enable score corrections, add all three
+settings to the Dockge stack `.env` file and use deployment-only values:
+
+```dotenv
+ADMIN_USERNAME=your-admin-name
+ADMIN_PASSWORD=use-a-unique-long-password
+ADMIN_SESSION_SECRET=generate-a-separate-random-secret
+ADMIN_SESSION_COOKIE_SECURE=true
+```
+
+`ADMIN_SESSION_SECRET` signs the browser session cookie; it is separate from the
+administrator password. Keep these values in Dockge or another deployment
+secret store, never in the repository. `ADMIN_SESSION_COOKIE_SECURE` defaults
+to `true` so browsers send the session cookie only over HTTPS. Set it to `false`
+only for local development over plain HTTP.
+
+If any of the username, password, or session-signing secret is absent, the app
+omits administrator controls and disables sign-in and score mutation routes.
+Match browsing and public match submission remain available.
+
 The Compose file declares the named volume `fussball-data` with an explicit
 Docker volume name, mounted at `/app/data`. The application database is
 `/app/data/database.db`. Keep this volume name and do not remove the volume when
