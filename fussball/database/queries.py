@@ -1,12 +1,13 @@
 from uuid import UUID
-from sqlalchemy import select, func, desc, union_all
-from sqlalchemy.orm import aliased, Session
-from database.tables import Player, PlayerRating, Match, Team
-from database.dto import PlayerRatingInfo, MatchDetails
+
+from database.dto import MatchDetails, PlayerRatingInfo
+from database.tables import Match, Player, PlayerRating, Team
+from sqlalchemy import desc, func, select, union_all
+from sqlalchemy.orm import Session, aliased
 
 
 def list_matches(con: Session, limit: int = 10) -> list[Match]:
-    stmt = select(Match).order_by(desc(Match.created_at)).limit(limit)
+    stmt = select(Match).order_by(desc(Match.created_at), desc(Match.id)).limit(limit)
     result = con.execute(stmt)
     rows = result.scalars().all()
     return rows
@@ -30,6 +31,11 @@ def get_match_details(con: Session, match_id: UUID) -> MatchDetails:
             p4.name.label("player4_name"),
             Match.winning_team_score.label("team1_score"),
             Match.losing_team_score.label("team2_score"),
+            # The edit form needs IDs to preselect the recorded lineup, including inactive participants.
+            wt.team_player_1_id.label("player1_id"),
+            wt.team_player_2_id.label("player2_id"),
+            lt.team_player_1_id.label("player3_id"),
+            lt.team_player_2_id.label("player4_id"),
         )
         .join(wt, Match.winning_team_id == wt.id)
         .join(lt, Match.losing_team_id == lt.id)
@@ -63,7 +69,6 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
         .join(wt, Match.winning_team_id == wt.id)
         .join(lt, Match.losing_team_id == lt.id)
         .where(Match.id == match_id)
-        .order_by(Match.id.desc())
         .limit(1)
         .cte("last_match")
     )
@@ -79,6 +84,7 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
 
     # scalar subquery for match_time from last_match CTE
     match_time_sq = select(last_match.c.match_time).scalar_subquery()
+    match_id_sq = select(last_match.c.match_id).scalar_subquery()
 
     # ratings recorded for the given match (latest rating per player for that player_match)
     pr_after = (
@@ -96,16 +102,24 @@ def get_player_ratings_after_match(con: Session, match_id: UUID) -> list[PlayerR
     )
 
     # latest rating before the match time for each player
+    previous_match = aliased(Match, name="previous_match")
     pr_before = (
         select(
             pr.player_id.label("player_id"),
             pr.rating.label("rating"),
-            pr.created_at.label("created_at"),
-            func.row_number().over(partition_by=pr.player_id, order_by=pr.created_at.desc()).label("rn"),
+            previous_match.created_at.label("created_at"),
+            func.row_number()
+            .over(
+                partition_by=pr.player_id,
+                order_by=(previous_match.created_at.desc(), previous_match.id.desc()),
+            )
+            .label("rn"),
         )
+        .join(previous_match, pr.match_id == previous_match.id)
         .where(
             pr.player_id.in_(select(players_union.c.player_id)),
-            pr.created_at < match_time_sq,
+            (previous_match.created_at < match_time_sq)
+            | ((previous_match.created_at == match_time_sq) & (previous_match.id < match_id_sq)),
         )
         .cte("pr_before")
     )

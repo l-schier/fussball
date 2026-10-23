@@ -19,8 +19,9 @@ class PlayerWithRating:
 def list_players(con: Session) -> list[PlayerWithRating]:
     latest_rating_subq = (
         select(PlayerRating.rating)
+        .join(Match, PlayerRating.match_id == Match.id)
         .where(Player.id == PlayerRating.player_id)
-        .order_by(PlayerRating.created_at.desc())
+        .order_by(Match.created_at.desc(), Match.id.desc())
         .limit(1)
         .scalar_subquery()
     )
@@ -45,7 +46,7 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating | Sequence[Ro
         .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
         .join(Match, PlayerRating.match_id == Match.id, isouter=True)
         .where(Player.id == player_id)
-        .order_by(PlayerRating.created_at.desc())
+        .order_by(Match.created_at.desc(), Match.id.desc())
         .limit(10)
     )
 
@@ -108,7 +109,7 @@ def get_player_ratings_page(con: Session, player_id: UUID, page: int, page_size:
         .select_from(PlayerRating)
         .join(Match, PlayerRating.match_id == Match.id, isouter=True)
         .where(PlayerRating.player_id == player_id)
-        .order_by(PlayerRating.created_at.desc())
+        .order_by(Match.created_at.desc(), Match.id.desc())
         .offset(offset)
         .limit(page_size + 1)
     )

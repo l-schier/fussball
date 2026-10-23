@@ -4,6 +4,11 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
+      ADMIN_SESSION_COOKIE_SECURE: ${ADMIN_SESSION_COOKIE_SECURE:-true}
     volumes:
       - fussball-data:/app/data
 
