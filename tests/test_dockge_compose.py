@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 COMPOSE_FILE = Path(__file__).resolve().parents[1] / "compose.yaml"
+LOCAL_COMPOSE_OVERRIDE = Path(__file__).resolve().parents[1] / "compose.override.yaml"
 
 
 def test_dockge_stack_persists_sqlite_data_and_defaults_to_latest() -> None:
@@ -18,6 +19,17 @@ def test_dockge_stack_persists_sqlite_data_and_defaults_to_latest() -> None:
     assert compose["services"]["app"]["image"] == "ghcr.io/l-schier/fussball:${IMAGE_TAG:-latest}"
     assert compose["services"]["app"]["volumes"] == ["fussball-data:/app/data"]
     assert compose["volumes"]["fussball-data"]["name"] == "fussball-data"
+
+
+def test_local_compose_override_builds_a_local_image() -> None:
+    compose = yaml.safe_load(LOCAL_COMPOSE_OVERRIDE.read_text())
+    app = compose["services"]["app"]
+
+    assert app["image"] == "fussball:local"
+    assert app["build"] == {"context": ".", "dockerfile": "Dockerfile"}
+    assert app["pull_policy"] == "build"
+    assert app["volumes"] == ["fussball-data-dev:/app/data"]
+    assert compose["volumes"]["fussball-data-dev"]["name"] == "fussball-data-dev"
 
 
 def test_compose_renders_selected_image_tag_and_stable_volume_name() -> None:

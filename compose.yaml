@@ -10,9 +10,9 @@ services:
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
       ADMIN_SESSION_COOKIE_SECURE: ${ADMIN_SESSION_COOKIE_SECURE:-true}
     volumes:
-      - fussball_data:/app/data
+      - fussball-data:/app/data
 
 volumes:
-  fussball_data:
-    name: fussball-data-local
+  fussball-data:
+    name: fussball-data
     driver: local
