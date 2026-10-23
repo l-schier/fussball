@@ -933,9 +933,14 @@ def test_administrator_can_review_and_cancel_match_removal_without_changes(confi
     assert "Player 1 &amp; Player 2" in confirmation.text
     assert "Player 3 &amp; Player 4" in confirmation.text
     assert "5" in confirmation.text and "2" in confirmation.text
-    assert f'hx-post="/match/{match_id}/remove"' in confirmation.text
-    assert f'href="/match/{match_id}"' in confirmation.text
-    assert "Cancel" in confirmation.text
+    removal_post = confirmation.text.index(f'hx-post="/match/{match_id}/remove"')
+    form_start = confirmation.text.rfind("<form", 0, removal_post)
+    form_end = confirmation.text.index("</form>", removal_post)
+    removal_form = confirmation.text[form_start:form_end]
+    assert "Permanently remove this match?" in removal_form
+    assert "Player 1 &amp; Player 2" in removal_form
+    assert f'href="/match/{match_id}"' in removal_form
+    assert "Cancel" in removal_form
     cancelled = client.get(f"/match/{match_id}")
     assert cancelled.status_code == 200
     assert "Match Details" in cancelled.text

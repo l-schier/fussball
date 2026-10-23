@@ -96,15 +96,15 @@ def list_matches(con: Connection):
 
 
 def render_match_removal_confirmation(match_details: MatchDetails) -> None:
-    ui.element("h2", "Permanently remove this match?")
     team_1 = match_details.player1_name + (f" & {match_details.player2_name}" if match_details.player2_name else "")
     team_2 = match_details.player3_name + (f" & {match_details.player4_name}" if match_details.player4_name else "")
-    ui.element("p", f"Match: {team_1} {match_details.team1_score} – {match_details.team2_score} {team_2}")
-    ui.element("p", f"Played at: {match_details.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
-    ui.element("p", "This permanently removes the match and recalculates ratings. This cannot be undone.")
     with ui.form().on_submit(routes["match_remove"].format(match_id=match_details.matchid), swap="outerHTML"):
+        ui.element("h2", "Permanently remove this match?")
+        ui.element("p", f"Match: {team_1} {match_details.team1_score} – {match_details.team2_score} {team_2}")
+        ui.element("p", f"Played at: {match_details.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        ui.element("p", "This permanently removes the match and recalculates ratings. This cannot be undone.")
         ui.button("Permanently remove match").classes("btn-danger")
-    ui.link("Cancel", routes["match_detail"].format(match_id=match_details.matchid))
+        ui.link("Cancel", routes["match_detail"].format(match_id=match_details.matchid))
 
 
 def get_match_player_options(con: Connection, match_details: MatchDetails) -> list[tuple[str, str]]:
