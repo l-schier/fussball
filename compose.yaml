@@ -5,4 +5,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
+      - fussball_data:/app/data
+
+volumes:
+  fussball_data:
+    name: fussball-data-local
+    driver: local
