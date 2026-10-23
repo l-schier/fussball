@@ -7,18 +7,16 @@ from database.dto import MatchDetails
 from database.queries import get_match_details
 from database.setup import Connection
 from database.tables import Match, Player
-from elo.match_correction import (
-    InvalidPlayerSelectionError,
-    MatchNotFoundError,
-    correct_match_scores,
-)
+from elo.match_correction import InvalidPlayerSelectionError, correct_match_scores
+from elo.match_errors import MatchNotFoundError
+from elo.match_removal import remove_match
 from elo.upload_match import MatchCorrection
 from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy import or_, select
 from uiwiz import PageRouter, ui
 
 from pages import routes
-from pages.fragment.ui_match import render_match_from_id, render_match_list
+from pages.fragment.ui_match import format_team_label, render_match_from_id, render_match_list
 
 match_router = PageRouter()
 
@@ -59,6 +57,31 @@ async def edit_match_score(
     response.headers["HX-Push-Url"] = routes["match_detail"].format(match_id=match_id)
 
 
+@match_router.page(routes["match_remove"])
+async def confirm_match_removal(match_id: str, con: Connection, _: None = Depends(require_admin)):
+    match_uuid = UUID(match_id)
+    if con.get(Match, match_uuid) is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    render_match_removal_confirmation(get_match_details(con, match_uuid))
+
+
+@match_router.ui(routes["match_remove"])
+async def remove_match_action(
+    match_id: str,
+    con: Connection,
+    response: Response,
+    _: None = Depends(require_admin),
+):
+    try:
+        remove_match(con, UUID(match_id))
+    except MatchNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Match not found") from exc
+
+    render_match_list(con)
+    ui.toast("Match removed").success()
+    response.headers["HX-Push-Url"] = routes["Matches"]
+
+
 @match_router.page(routes["match_detail"])
 async def view_match(match_id: str, con: Connection, request: Request):
     settings: Settings = request.app.state.admin_settings
@@ -70,6 +93,18 @@ async def view_match(match_id: str, con: Connection, request: Request):
 @match_router.page(routes["Matches"])
 def list_matches(con: Connection):
     render_match_list(con)
+
+
+def render_match_removal_confirmation(match_details: MatchDetails) -> None:
+    team_1 = format_team_label(match_details.player1_name, match_details.player2_name)
+    team_2 = format_team_label(match_details.player3_name, match_details.player4_name)
+    with ui.form().on_submit(routes["match_remove"].format(match_id=match_details.matchid), swap="outerHTML"):
+        ui.element("h2", "Permanently remove this match?")
+        ui.element("p", f"Match: {team_1} {match_details.team1_score} – {match_details.team2_score} {team_2}")
+        ui.element("p", f"Played at: {match_details.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        ui.element("p", "This permanently removes the match and recalculates ratings. This cannot be undone.")
+        ui.button("Permanently remove match").classes("btn-danger")
+        ui.link("Cancel", routes["match_detail"].format(match_id=match_details.matchid))
 
 
 def get_match_player_options(con: Connection, match_details: MatchDetails) -> list[tuple[str, str]]:
