@@ -22,20 +22,33 @@ def test_production_image_is_published_only_after_a_semantic_release() -> None:
     assert "publish-candidate" not in workflow["jobs"]
 
     release = workflow["jobs"]["release"]
-    assert release["permissions"] == {"contents": "write", "id-token": "write"}
+    assert release["permissions"] == {"contents": "read", "id-token": "write"}
+    app_token = next(step for step in release["steps"] if step.get("id") == "release-token")
+    assert app_token["uses"] == "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
+    assert app_token["with"] == {
+        "client-id": "${{ vars.RELEASE_APP_CLIENT_ID }}",
+        "private-key": "${{ secrets.RELEASE_APP_PRIVATE_KEY }}",
+        "permission-contents": "write",
+    }
     preview = next(step for step in release["steps"] if step.get("id") == "preview")
+    assert preview["with"]["github_token"] == "${{ steps.release-token.outputs.token }}"
     assert preview["with"]["no_operation_mode"] == "true"
     assert preview["with"]["changelog"] == "false"
     baseline_check = next(step for step in release["steps"] if "historical release baseline" in step.get("name", ""))["run"]
     assert "v3.4.1" in baseline_check
     assert "94c8403275e2e8f34314d30e83d6d5b40b8f99c6" in baseline_check
     release_action = next(step for step in release["steps"] if step.get("id") == "release")
+    assert release_action["with"]["github_token"] == "${{ steps.release-token.outputs.token }}"
     assert release_action["if"] == "steps.preview.outputs.released == 'true'"
+    release_notes = next(step for step in release["steps"] if step.get("name") == "Publish major release Upgrade notes")
+    assert release_notes["env"]["GH_TOKEN"] == "${{ steps.release-token.outputs.token }}"
 
     publish = workflow["jobs"]["publish-production"]
     assert publish["needs"] == "release"
     assert publish["if"] == "needs.release.outputs.released == 'true'"
     assert publish["permissions"] == {"contents": "read", "packages": "write"}
+    registry_login = next(step for step in publish["steps"] if step.get("name") == "Log in to GitHub Container Registry")
+    assert registry_login["with"]["password"] == "${{ secrets.GITHUB_TOKEN }}"
     checkout = next(step for step in publish["steps"] if step.get("uses", "").startswith("actions/checkout@"))
     assert checkout["with"]["ref"] == "${{ needs.release.outputs.commit_sha }}"
     assert checkout["with"]["persist-credentials"] == "false"

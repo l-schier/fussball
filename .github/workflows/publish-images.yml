@@ -18,7 +18,7 @@ jobs:
       group: semantic-release-${{ github.ref }}
       cancel-in-progress: false
     permissions:
-      contents: write
+      contents: read
       id-token: write
     outputs:
       released: ${{ steps.release.outputs.released || steps.preview.outputs.released || 'false' }}
@@ -53,11 +53,19 @@ jobs:
             exit 1
           }
 
+      - name: Create a release GitHub App token
+        id: release-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - name: Preview the semantic release without publishing
         id: preview
         uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
         with:
-          github_token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.release-token.outputs.token }}
           no_operation_mode: "true"
           changelog: "false"
 
@@ -75,7 +83,7 @@ jobs:
         if: steps.preview.outputs.released == 'true'
         uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
         with:
-          github_token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.release-token.outputs.token }}
           git_committer_name: github-actions
           git_committer_email: actions@users.noreply.github.com
           changelog: "false"
@@ -83,7 +91,7 @@ jobs:
       - name: Publish major release Upgrade notes
         if: steps.validate-notes.outputs.is_major == 'true'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           GH_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           PREVIOUS_VERSION: ${{ steps.release.outputs.previous_version }}
