@@ -16,9 +16,10 @@ when to pull and deploy an image in Dockge.
    IMAGE_TAG=latest
    ```
 
-   `latest` selects the latest image published from `main`. For a pinned
-   release, use the full commit SHA tag instead, for example
-   `IMAGE_TAG=0123456789abcdef0123456789abcdef01234567`.
+   `latest` selects the most recently released image. To pin an exact release,
+   use its SemVer tag, for example `IMAGE_TAG=3.4.1`. The registry also provides
+   major (`3`) and major.minor (`3.4`) aliases; all aliases move only when a
+   release is published.
 4. Save and deploy the stack in Dockge. The app listens on port `8000`; make it
    reachable through the existing VM/network setup as appropriate.
 
@@ -99,7 +100,7 @@ backup API shown above.
 After the backup has been verified:
 
 1. In the Dockge `fussball` stack, edit `.env` and set `IMAGE_TAG` to `latest`
-   or the full commit SHA you intend to deploy.
+   or the exact SemVer release tag you intend to deploy, such as `3.4.1`.
 2. Save the stack, then use Dockge's **Pull** action to fetch the selected
    image. Pulling alone does not deploy it.
 3. Review the selected tag and use Dockge's **Deploy** action to recreate the
