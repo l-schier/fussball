@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from uuid import UUID
 
 from database.queries_players import PlayerWithRating
@@ -12,7 +11,6 @@ def render_player_ratings_table_content(
     ratings: list[dict],
     page: int,
     total_pages: int,
-    on_page_change: Callable,
     page_size: int = 10,
 ):
     visible_ratings = ratings[:page_size]
@@ -47,10 +45,9 @@ def render_player_ratings_table_content(
     with ui.element("div").classes("mt-3 flex items-center justify-between"):
         prev_button = ui.button("Prev").classes("btn btn-sm")
         prev_button.on_click(
-            on_page_change,
+            routes["player_ratings"].format(player_id=player_id, page=max(page - 1, 1)),
             target="ratings-container",
             swap="innerHTML",
-            params={"player_id": str(player_id), "page": str(max(page - 1, 1))},
         )
         if page <= 1:
             prev_button.attributes["disabled"] = True  # ty: ignore[invalid-assignment]
@@ -59,10 +56,9 @@ def render_player_ratings_table_content(
 
         next_button = ui.button("Next").classes("btn btn-sm")
         next_button.on_click(
-            on_page_change,
+            routes["player_ratings"].format(player_id=player_id, page=min(page + 1, total_pages)),
             target="ratings-container",
             swap="innerHTML",
-            params={"player_id": str(player_id), "page": str(min(page + 1, total_pages))},
         )
         if page >= total_pages:
             next_button.attributes["disabled"] = True  # ty: ignore[invalid-assignment]
@@ -73,11 +69,10 @@ def render_player_ratings_table(
     ratings: list[dict],
     page: int,
     total_pages: int,
-    on_page_change: Callable,
 ):
     with ui.element() as ratings_container:
         ratings_container.attributes["id"] = "ratings-container"
-        render_player_ratings_table_content(player_id, ratings, page, total_pages, on_page_change)
+        render_player_ratings_table_content(player_id, ratings, page, total_pages)
 
 
 def render_player(
@@ -86,7 +81,6 @@ def render_player(
     player_id: UUID,
     ratings: list[dict],
     total_pages: int,
-    on_page_change: Callable,
 ):
     ui.element("h2", player.name)
     ui.element("p", f"Ranking: {player.ranking}")
@@ -95,9 +89,7 @@ def render_player(
     with ui.element("div").classes("grid grid-cols-1 md:grid-cols-2"):
         with ui.element():
             ui.element("h3", "Ratings")
-            render_player_ratings_table(
-                player_id, ratings, page=1, total_pages=total_pages, on_page_change=on_page_change
-            )
+            render_player_ratings_table(player_id, ratings, page=1, total_pages=total_pages)
 
             ratings = [entry["rating"] for entry in reversed(player.history)] if player.history else []
             min_rating = ((min(ratings) // 100) * 100 - 100) if ratings else 0  # ty: ignore[invalid-argument-type]

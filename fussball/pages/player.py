@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from uiwiz import Page, PageRouter, ui
 
+from pages import routes
 from pages.fragment.ui_player import render_player, render_player_list, render_player_ratings_table_content
 from pages.layout import Layout
 
@@ -72,10 +73,10 @@ def view_player(player_id: str, con: Connection, page: Page):
     total_pages = max(1, math.ceil(total_ratings / 10))
     ratings = get_player_ratings_page(con, player_uuid, page=1, page_size=10)
 
-    render_player(player, player_match_count, player_uuid, ratings, total_pages, player_ratings_page)  # ty: ignore[invalid-argument-type]
+    render_player(player, player_match_count, player_uuid, ratings, total_pages)
 
 
-@player_router.ui("/{player_id}/ratings/{page}")
+@player_router.ui(routes["player_ratings"].removeprefix(player_router.prefix))
 def player_ratings_page(player_id: str, page: int, con: Connection):
     player_uuid = uuid.UUID(player_id)
     safe_page = max(page, 1)
@@ -89,7 +90,6 @@ def player_ratings_page(player_id: str, page: int, con: Connection):
         ratings=ratings,
         page=safe_page,
         total_pages=total_pages,
-        on_page_change=player_ratings_page,
     )
 
 
