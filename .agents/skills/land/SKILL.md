@@ -81,7 +81,7 @@ A `404` from the classic branch-protection endpoint does not mean no rules apply
 - Any required review approvals and conversation resolutions are satisfied.
 - `main` has not advanced since the final sync. If it has, merge the new `origin/main` tip into the work branch and restart the tests and review.
 
-The repository has no general test workflow. `publish-images` only builds an image after Python Semantic Release creates a release; PRs and ordinary non-release merges do not publish images (`.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`). Do not add candidate-image labels to manufacture a check; candidate publishing has been retired.
+The `tests` workflow runs on PRs targeting `main`. `publish-images` only builds an image after Python Semantic Release creates a release; ordinary non-release merges do not publish images (`.github/workflows/tests.yml`, `.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`). Do not add candidate-image labels to manufacture a check; candidate publishing has been retired.
 
 A release-worthy merge to `main` automatically creates a GitHub Release and publishes GHCR SemVer aliases (`X.Y.Z`, `X.Y`, `X`, and `latest`); it does not deploy the live stack (`.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`, `docs/deployment.md`). Before the merge, disclose this side effect and obtain explicit authorization for release and package publication if the user's landing request does not already authorize it. Do not perform a live deployment or change package visibility.
 
