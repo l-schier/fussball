@@ -2,9 +2,9 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
-from database.tables import Match, Player, PlayerRating
+from database.tables import Match, Player, PlayerRating, Team, TeamMatch
 from pydantic.dataclasses import dataclass
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, case, func, or_, select
 from sqlalchemy.orm import Session
 
 
@@ -14,6 +14,12 @@ class PlayerWithRating:
     name: str
     ranking: int | None
     history: list[dict] | None = None
+
+
+@dataclass
+class PlayerWinStats:
+    wins: int
+    matches_played: int
 
 
 def list_players(con: Session) -> list[PlayerWithRating]:
@@ -70,23 +76,24 @@ def show_player(con: Session, player_id: UUID) -> PlayerWithRating | Sequence[Ro
     return PlayerWithRating(id=rows[0].id, name=rows[0].name, ranking=rows[0].rating, history=history)
 
 
-def get_player_matches(con: Session, player_id: UUID) -> int | None:
-    stmt = (
-        select(func.count())
-        .select_from(Player)
-        .join(PlayerRating, Player.id == PlayerRating.player_id, isouter=True)
-        .join(Match, PlayerRating.match_id == Match.id, isouter=True)
-        .where(Player.id == player_id)
-        .order_by(PlayerRating.created_at.desc())
+def get_player_win_stats(con: Session, player_id: UUID) -> PlayerWinStats:
+    player_match_results = (
+        select(
+            Match.id.label("match_id"),
+            func.max(case((TeamMatch.team_id == Match.winning_team_id, 1), else_=0)).label("won"),
+        )
+        .join(TeamMatch, TeamMatch.match_id == Match.id)
+        .join(Team, Team.id == TeamMatch.team_id)
+        .where(or_(Team.team_player_1_id == player_id, Team.team_player_2_id == player_id))
+        .group_by(Match.id)
+        .subquery()
     )
-
-    result = con.execute(stmt)
-    rows = result.fetchone()
-
-    if rows is None:
-        return None
-
-    return rows[0]
+    stmt = select(
+        func.count(player_match_results.c.match_id),
+        func.coalesce(func.sum(player_match_results.c.won), 0),
+    )
+    matches_played, wins = con.execute(stmt).one()
+    return PlayerWinStats(wins=wins, matches_played=matches_played)
 
 
 def count_player_ratings(con: Session, player_id: UUID) -> int:
