@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from database.queries_players import PlayerWithRating
+from database.queries_players import PlayerWinStats, PlayerWithRating
 from pages import routes
 from pages.fragment.arrow import render_rating_diff
 from uiwiz import ui
@@ -77,14 +77,24 @@ def render_player_ratings_table(
 
 def render_player(
     player: PlayerWithRating,
-    player_match_count: int,
+    win_stats: PlayerWinStats,
     player_id: UUID,
     ratings: list[dict],
     total_pages: int,
 ):
     ui.element("h2", player.name)
     ui.element("p", f"Ranking: {player.ranking}")
-    ui.element("h3", f"Total Matches: {player_match_count}")
+    ui.element("h3", f"Total Matches: {win_stats.matches_played}")
+    if win_stats.matches_played:
+        win_rate = win_stats.wins / win_stats.matches_played * 100
+        win_label = "win" if win_stats.wins == 1 else "wins"
+        match_label = "match" if win_stats.matches_played == 1 else "matches"
+        ui.element(
+            "h3",
+            f"Lifetime Win Rate: {win_stats.wins} {win_label} / {win_stats.matches_played} {match_label} ({win_rate:.1f}%)",
+        )
+    else:
+        ui.element("h3", "No matches yet")
 
     with ui.element("div").classes("grid grid-cols-1 md:grid-cols-2"):
         with ui.element():
