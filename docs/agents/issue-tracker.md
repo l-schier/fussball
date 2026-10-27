@@ -14,6 +14,13 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Issue-kind labels
+
+These labels classify what an issue represents and can be combined with the triage labels in `docs/agents/triage-labels.md`:
+
+- `spec`: an issue defining requirements, design, or acceptance criteria for scoped work.
+- `subtask`: an implementation work item that breaks down a parent issue. Also link it to its parent with one of the GitHub sub-issue methods above; the label alone does not establish that relationship.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
