@@ -4,11 +4,6 @@ name: Publish container images
 # GHCR package visibility is separate from repository visibility and cannot be set with GITHUB_TOKEN.
 # Set package visibility to match the repository after the first publish (public here); see docs/ghcr-publishing.md.
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - labeled
   push:
     branches:
       - main
@@ -16,67 +11,101 @@ on:
 permissions: {}
 
 jobs:
-  publish-candidate:
-    name: Publish labeled pull request candidate
-    if: github.event.label.name == 'build-image' && github.event.pull_request.head.repo.full_name == github.repository
+  release:
+    name: Create semantic release when warranted
     runs-on: ubuntu-latest
+    concurrency:
+      group: semantic-release-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
-      contents: read
-      packages: write
+      contents: write
+      id-token: write
+    outputs:
+      released: ${{ steps.release.outputs.released || steps.preview.outputs.released || 'false' }}
+      version: ${{ steps.release.outputs.version || steps.preview.outputs.version }}
+      previous_version: ${{ steps.release.outputs.previous_version || steps.preview.outputs.previous_version }}
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
-      - name: Check out the labeled commit
+      - name: Check out the main branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Reset to the commit that triggered this run
+        run: git reset --hard "${{ github.sha }}"
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - name: Require the historical release baseline
+        run: |
+          git show-ref --verify --quiet refs/tags/v3.4.1 || {
+            echo "Required historical baseline tag v3.4.1 is missing. Complete the approved backfill before enabling releases." >&2
+            exit 1
+          }
+          baseline_sha="$(git rev-parse 'v3.4.1^{commit}')"
+          test "$baseline_sha" = "94c8403275e2e8f34314d30e83d6d5b40b8f99c6" || {
+            echo "Historical baseline v3.4.1 points to $baseline_sha instead of the PR #38 merge commit." >&2
+            exit 1
+          }
+          git merge-base --is-ancestor v3.4.1 "$GITHUB_SHA" || {
+            echo "Historical baseline tag v3.4.1 is not an ancestor of this main commit." >&2
+            exit 1
+          }
+
+      - name: Preview the semantic release without publishing
+        id: preview
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          no_operation_mode: "true"
+          changelog: "false"
 
-      - name: Build and push candidate image
-        id: build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=Candidate image for PR ${{ github.event.pull_request.number }}
-
-  remove-build-label:
-    name: Remove label after candidate publish
-    needs: publish-candidate
-    if: needs.publish-candidate.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Remove one-shot build label
+      - name: Validate manually written major upgrade notes
+        id: validate-notes
+        if: steps.preview.outputs.released == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIOUS_VERSION: ${{ steps.preview.outputs.previous_version }}
+          VERSION: ${{ steps.preview.outputs.version }}
+          RELEASE_NOTES: ${{ steps.preview.outputs.release_notes }}
+        run: python .github/scripts/prepare_release_notes.py --preflight
+
+      - name: Create the semantic release
+        id: release
+        if: steps.preview.outputs.released == 'true'
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          git_committer_name: github-actions
+          git_committer_email: actions@users.noreply.github.com
+          changelog: "false"
+
+      - name: Publish major release Upgrade notes
+        if: steps.validate-notes.outputs.is_major == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           GH_REPOSITORY: ${{ github.repository }}
-        run: gh api --method DELETE "repos/$GH_REPOSITORY/issues/$GH_PR_NUMBER/labels/build-image"
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PREVIOUS_VERSION: ${{ steps.release.outputs.previous_version }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_NOTES: ${{ steps.release.outputs.release_notes }}
+        run: |
+          python .github/scripts/prepare_release_notes.py --output "$RUNNER_TEMP/release-notes.md"
+          gh release edit "$RELEASE_TAG" --repo "$GH_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md"
 
   publish-production:
-    name: Publish production image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Build and publish released image
+    needs: release
+    if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Check out the production commit
+      - name: Check out the released commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ needs.release.outputs.commit_sha }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
@@ -89,15 +118,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push production image
+      - name: Generate release image tags
+        id: metadata
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.release.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push release image
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ steps.metadata.outputs.tags }}
           labels: |
+            ${{ steps.metadata.outputs.labels }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=Production image
+            org.opencontainers.image.description=Production release image

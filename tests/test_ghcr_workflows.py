@@ -3,50 +3,91 @@ from __future__ import annotations
 import importlib.util
 import re
 from pathlib import Path
+from tomllib import loads
 
 import pytest
 import yaml
 
-WORKFLOWS = Path(__file__).resolve().parents[1] / ".github" / "workflows"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKFLOWS = PROJECT_ROOT / ".github" / "workflows"
 CLEANUP_SCRIPT = Path(__file__).resolve().parents[1] / ".github" / "scripts" / "cleanup_candidate_images.py"
+RELEASE_NOTES_SCRIPT = Path(__file__).resolve().parents[1] / ".github" / "scripts" / "prepare_release_notes.py"
 
 
-def test_production_image_publishes_latest_and_commit_tags_on_main() -> None:
+def test_production_image_is_published_only_after_a_semantic_release() -> None:
     workflow = yaml.load((WORKFLOWS / "publish-images.yml").read_text(), Loader=yaml.BaseLoader)
 
     assert workflow["on"]["push"]["branches"] == ["main"]
+    assert "pull_request" not in workflow["on"]
+    assert "publish-candidate" not in workflow["jobs"]
+
+    release = workflow["jobs"]["release"]
+    assert release["permissions"] == {"contents": "write", "id-token": "write"}
+    preview = next(step for step in release["steps"] if step.get("id") == "preview")
+    assert preview["with"]["no_operation_mode"] == "true"
+    assert preview["with"]["changelog"] == "false"
+    baseline_check = next(step for step in release["steps"] if "historical release baseline" in step.get("name", ""))["run"]
+    assert "v3.4.1" in baseline_check
+    assert "94c8403275e2e8f34314d30e83d6d5b40b8f99c6" in baseline_check
+    release_action = next(step for step in release["steps"] if step.get("id") == "release")
+    assert release_action["if"] == "steps.preview.outputs.released == 'true'"
+
     publish = workflow["jobs"]["publish-production"]
-    assert publish["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    assert publish["needs"] == "release"
+    assert publish["if"] == "needs.release.outputs.released == 'true'"
     assert publish["permissions"] == {"contents": "read", "packages": "write"}
     checkout = next(step for step in publish["steps"] if step.get("uses", "").startswith("actions/checkout@"))
+    assert checkout["with"]["ref"] == "${{ needs.release.outputs.commit_sha }}"
     assert checkout["with"]["persist-credentials"] == "false"
+
+    metadata = next(step for step in publish["steps"] if step.get("id") == "metadata")
+    tags = metadata["with"]["tags"]
+    assert "pattern={{version}}" in tags
+    assert "pattern={{major}}.{{minor}}" in tags
+    assert "pattern={{major}}" in tags
+    assert "type=raw,value=latest" in tags
+    assert "type=sha" not in tags
+
     build = next(step for step in publish["steps"] if step.get("id") == "build")
-    assert "latest" in build["with"]["tags"]
-    assert "github.sha" in build["with"]["tags"]
-    assert "Production image" in build["with"]["labels"]
+    assert "github.sha" not in build["with"]["tags"]
+    assert "Production release image" in build["with"]["labels"]
 
 
-def test_candidate_image_is_one_shot_and_limited_to_same_repository_pull_requests() -> None:
-    workflow = yaml.load((WORKFLOWS / "publish-images.yml").read_text(), Loader=yaml.BaseLoader)
+def test_semantic_release_config_matches_the_backfilled_version_and_bump_policy() -> None:
+    project = loads((PROJECT_ROOT / "pyproject.toml").read_text())
+    release = project["tool"]["semantic_release"]
+    commit_rules = release["commit_parser_options"]
 
-    assert workflow["on"]["pull_request"]["branches"] == ["main"]
-    assert workflow["on"]["pull_request"]["types"] == ["labeled"]
-    assert "pull_request_target" not in workflow["on"]
-    candidate = workflow["jobs"]["publish-candidate"]
-    assert "build-image" in candidate["if"]
-    assert "head.repo.full_name == github.repository" in candidate["if"]
-    assert candidate["permissions"] == {"contents": "read", "packages": "write"}
-    checkout = next(step for step in candidate["steps"] if step.get("uses", "").startswith("actions/checkout@"))
-    assert "pull_request.head.sha" in checkout["with"]["ref"]
-    build = next(step for step in candidate["steps"] if step.get("id") == "build")
-    assert "pull_request.number" in build["with"]["tags"]
-    assert "pull_request.head.sha" in build["with"]["tags"]
-    assert "Candidate image for PR" in build["with"]["labels"]
+    assert project["project"]["version"] == "3.4.1"
+    assert release["tag_format"] == "v{version}"
+    assert release["version_toml"] == ["pyproject.toml:project.version"]
+    assert commit_rules["minor_tags"] == ["feat"]
+    assert commit_rules["patch_tags"] == ["fix", "perf"]
+    assert commit_rules["default_bump_level"] == 0
 
-    remove_label = workflow["jobs"]["remove-build-label"]
-    assert remove_label["needs"] == "publish-candidate"
-    assert "needs.publish-candidate.result == 'success'" in remove_label["if"]
-    assert remove_label["permissions"] == {"issues": "write"}
+    lock = loads((PROJECT_ROOT / "uv.lock").read_text())
+    app_package = next(package for package in lock["package"] if package["name"] == "fussball")
+    assert app_package["version"] == project["project"]["version"]
+
+
+def test_major_release_notes_require_manual_breaking_change_details() -> None:
+    spec = importlib.util.spec_from_file_location("prepare_release_notes", RELEASE_NOTES_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    release_notes = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(release_notes)
+
+    notes = "## v3.0.0\n\n### Breaking Changes\n\n- Move the database to the new persistent volume.\n"
+    is_major, updated = release_notes.prepare_release_notes("3.0.0", "2.4.0", notes)
+    assert is_major is True
+    assert "### Upgrade notes" in updated
+    assert "### Breaking Changes" not in updated
+
+    with pytest.raises(ValueError, match="BREAKING CHANGE footer"):
+        release_notes.prepare_release_notes("3.0.0", "2.4.0", "## v3.0.0\n\n### Features\n")
+
+    is_major, unchanged = release_notes.prepare_release_notes("3.4.2", "3.4.1", notes)
+    assert is_major is False
+    assert unchanged == notes
 
 
 def test_closed_pull_request_cleanup_deletes_only_its_candidate_versions() -> None:
