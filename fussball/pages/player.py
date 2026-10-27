@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from database.queries_players import (
     count_player_ratings,
-    get_player_matches,
     get_player_ratings_page,
+    get_player_win_stats,
     list_players,
     show_player,
 )
@@ -68,12 +68,12 @@ def new_player(con: Connection):
 def view_player(player_id: str, con: Connection, page: Page):
     player_uuid = uuid.UUID(player_id)
     player = show_player(con, player_uuid)
-    player_match_count = get_player_matches(con, player_uuid)
+    player_win_stats = get_player_win_stats(con, player_uuid)
     total_ratings = count_player_ratings(con, player_uuid)
     total_pages = max(1, math.ceil(total_ratings / 10))
     ratings = get_player_ratings_page(con, player_uuid, page=1, page_size=10)
 
-    render_player(player, player_match_count, player_uuid, ratings, total_pages)
+    render_player(player, player_win_stats, player_uuid, ratings, total_pages)
 
 
 @player_router.ui(routes["player_ratings"].removeprefix(player_router.prefix))
