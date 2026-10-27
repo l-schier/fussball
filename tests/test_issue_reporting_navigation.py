@@ -107,3 +107,8 @@ def test_report_issue_link_is_available_in_desktop_and_mobile_navigation() -> No
 
     internal_links = {(link.text, link.attributes["href"]) for link in parser.links}
     assert {("Home", "/"), ("Matches", "/match"), ("Players", "/player")} <= internal_links
+    rankings_links = [link for link in parser.links if link.text == "Team Rankings"]
+    assert len(rankings_links) == 2
+    assert any("menu-horizontal" in " ".join(link.navigation_classes) for link in rankings_links)
+    assert any("md:hidden" in " ".join(link.navigation_classes) for link in rankings_links)
+    assert all(link.attributes["href"] == "/team" for link in rankings_links)

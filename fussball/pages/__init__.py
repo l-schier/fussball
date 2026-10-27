@@ -2,6 +2,7 @@ page_routes = {
     "Home": "/",
     "Matches": "/match",
     "Players": "/player",
+    "Team Rankings": "/team",
 }
 
 routes = {
