@@ -35,7 +35,7 @@ dependencies = [
 [tool.semantic_release]
 allow_zero_version = false
 build_command = """
-python -m pip install uv==0.7.8
+python -m pip install uv
 uv lock --upgrade-package "$PACKAGE_NAME"
 git add uv.lock
 """

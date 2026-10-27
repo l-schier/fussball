@@ -63,7 +63,7 @@ def test_semantic_release_config_matches_the_backfilled_version_and_bump_policy(
     assert release["version_toml"] == ["pyproject.toml:project.version"]
     build_commands = [line.strip() for line in release["build_command"].splitlines() if line.strip()]
     assert build_commands == [
-        "python -m pip install uv==0.7.8",
+        "python -m pip install uv",
         'uv lock --upgrade-package "$PACKAGE_NAME"',
         "git add uv.lock",
     ]
