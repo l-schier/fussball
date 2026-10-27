@@ -227,6 +227,42 @@ def test_team_rankings_reflect_ratings_after_a_match_is_removed(configured_site)
     assert all(row[2] not in {"1600", "1700", "2100", "2200"} for row in rows)
 
 
+def test_team_rankings_reflect_recalculated_ratings_after_a_match_is_corrected(configured_site) -> None:
+    client, _, _, match_id, *_ = configured_site
+
+    before_correction = client.get("/team")
+    assert before_correction.status_code == 200
+    before_parser = TableRowsParser()
+    before_parser.feed(before_correction.text)
+    before_rows = [row for row in before_parser.rows if len(row) == 3 and row[0] != "Rank"]
+    before_ratings = {row[1]: row[2] for row in before_rows}
+    assert [(row[0], row[1]) for row in before_rows] == [
+        ("1", "Player 3 & Player 4"),
+        ("2", "Player 1 & Player 2"),
+    ]
+
+    sign_in = client.post("/admin/sign-in", json={"username": "admin", "password": "correct horse battery staple"})
+    assert sign_in.status_code == 200
+    correction = client.post(
+        f"/match/{match_id}/edit",
+        json={"score_team_1": 8, "score_team_2": 2},
+    )
+    assert correction.status_code == 200
+
+    response = client.get("/team")
+    assert response.status_code == 200
+    parser = TableRowsParser()
+    parser.feed(response.text)
+    rows = [row for row in parser.rows if len(row) == 3 and row[0] != "Rank"]
+
+    assert [(row[0], row[1]) for row in rows] == [
+        ("1", "Player 1 & Player 2"),
+        ("2", "Player 3 & Player 4"),
+    ]
+    assert all(row[2] != before_ratings[row[1]] for row in rows)
+    assert float(rows[0][2]) > float(rows[1][2])
+
+
 def test_team_rankings_show_an_empty_state_when_no_teams_are_recorded(configured_site) -> None:
     client, engine, tables, *_ = configured_site
     with Session(engine) as session:

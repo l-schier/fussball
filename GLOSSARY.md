@@ -12,3 +12,6 @@ The person responsible for maintaining player and match records.
 **Win rate**:
 The proportion of a player's recorded matches that the player won, expressed as a percentage of all matches played.
 _Avoid_: Winrate
+
+**Team ranking**:
+The competition ranking of teams based on their latest recorded rating; teams with equal current ratings share a rank.

@@ -14,6 +14,13 @@ class TeamRanking:
     rank: int | None
 
 
+@dataclass(frozen=True)
+class _TeamForRanking:
+    team_id: UUID
+    members: tuple[str, ...]
+    rating: int | None
+
+
 def list_team_rankings(con: Session) -> list[TeamRanking]:
     first_player = aliased(Player, name="first_player")
     second_player = aliased(Player, name="second_player")
@@ -40,38 +47,38 @@ def list_team_rankings(con: Session) -> list[TeamRanking]:
 
     rows = con.execute(statement).all()
     teams = [
-        (
-            team_id,
-            tuple(
+        _TeamForRanking(
+            team_id=team_id,
+            members=tuple(
                 sorted((name for name in (first_name, second_name) if name), key=lambda name: (name.casefold(), name))
             ),
-            rating,
+            rating=rating,
         )
         for team_id, first_name, second_name, rating in rows
     ]
     teams.sort(
         key=lambda team: (
-            team[2] is None,
-            -team[2] if team[2] is not None else 0,
-            tuple(name.casefold() for name in team[1]),
-            team[1],
-            str(team[0]),
+            team.rating is None,
+            -team.rating if team.rating is not None else 0,
+            tuple(name.casefold() for name in team.members),
+            team.members,
+            str(team.team_id),
         )
     )
 
     rankings: list[TeamRanking] = []
     previous_rating: int | None = None
     previous_rank: int | None = None
-    for position, (team_id, members, rating) in enumerate(teams, start=1):
-        if rating is None:
+    for position, team in enumerate(teams, start=1):
+        if team.rating is None:
             rank = None
-        elif rating == previous_rating:
+        elif team.rating == previous_rating:
             rank = previous_rank
         else:
             rank = position
-        rankings.append(TeamRanking(team_id=team_id, members=members, rating=rating, rank=rank))
-        if rating is not None:
-            previous_rating = rating
+        rankings.append(TeamRanking(team_id=team.team_id, members=team.members, rating=team.rating, rank=rank))
+        if team.rating is not None:
+            previous_rating = team.rating
             previous_rank = rank
 
     return rankings
