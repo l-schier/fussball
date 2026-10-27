@@ -56,7 +56,9 @@ Review the exact final diff against both the requested behavior/specification an
 
 ## Pull request and repository checks
 
-`main` is protected and requires a PR; use the GitHub pull-request workflow rather than pushing to `main`. Recent PRs #16, #30, and #31 were merged with merge commits, so use the merge-commit strategy. GitHub currently deletes remote head branches after merge. Check live branch protection and repository settings each time; current settings are not a permanent guarantee. The present configuration enforces protection for administrators, has no required status-check contexts, requires zero approvals, has no `CODEOWNERS` file, and does not require signed commits. If any rule changes, obey the current rule and wait for required human reviews; never use `--admin` to bypass it. The PR target is `main` (`.github/workflows/publish-images.yml`); the GitHub CLI is the repository's configured issue-tracker tool (`docs/agents/issue-tracker.md`).
+Contributors update `main` through PRs. GitHub may enforce this with classic branch protection, repository rulesets, or both; a missing classic branch-protection rule does not mean no rules apply. Automated exceptions must be explicitly allowed by the effective rules and scoped to the intended automation identity. Recent PRs #16, #30, and #31 were merged with merge commits, so use the merge-commit strategy. GitHub currently deletes remote head branches after merge. Check effective rules each time because repository settings can change. Follow the current rules and wait for required reviews; never use `--admin` or an unapproved bypass. The PR target is `main` (`.github/workflows/publish-images.yml`); the GitHub CLI is the repository's configured issue-tracker tool (`docs/agents/issue-tracker.md`).
+
+Require every individual commit introduced by a PR to use a Conventional Commit subject; keep merge commits and do not rely on the generated merge-commit message for release classification. Use `feat` for additive user-facing functionality, `fix` or `perf` for compatible corrections and performance improvements, and `docs`, `chore`, `test`, `ci`, or non-user-visible `refactor` for changes that should not release. Classify user-visible refactors as `feat` or `fix`. Mark breaking changes with `!` and/or a `BREAKING CHANGE:` footer. For any breaking release, include a `BREAKING CHANGE:` paragraph with manually written upgrade notes covering data/configuration risks, migration steps, and behavior changes; explicitly state when no special upgrade steps are required. The release workflow uses that text for the major release's **Upgrade notes** section and blocks a major release if it is missing.
 
 Publish only the work branch to `origin`, then create or update a PR targeting `main`. For a new PR, use a command of this form:
 
@@ -64,16 +66,26 @@ Publish only the work branch to `origin`, then create or update a PR targeting `
 gh pr create --base main --head "$branch" --title "$title" --body "$body"
 ```
 
-There is no PR template or contribution guide; include a concise summary, relevant issue/spec references when applicable, and the verification actually completed. Do not change issue state unless the user or the issue workflow requires it. Check live branch protection with `gh api repos/l-schier/fussball/branches/main/protection`, then verify that:
+There is no PR template or contribution guide; include a concise summary, relevant issue/spec references when applicable, and the verification actually completed. Do not change issue state unless the user or the issue workflow requires it. Inspect effective update rules before merging. Query classic branch protection and effective branch rules, then inspect active repository rulesets that match `main`, including their bypass actors:
+
+```sh
+gh api repos/l-schier/fussball/branches/main/protection
+gh api repos/l-schier/fussball/rules/branches/main
+gh api repos/l-schier/fussball/rulesets --paginate
+```
+
+A `404` from the classic branch-protection endpoint does not mean no rules apply. Inspect each applicable ruleset's details with `gh api repos/l-schier/fussball/rulesets/<id>`. Then verify that:
 
 - The PR head SHA is exactly the reviewed and tested commit.
 - Every required check for that SHA has completed successfully. Use `gh pr checks "$pr" --required` to inspect required checks and `gh pr checks "$pr" --watch` to wait for reported checks. Pending, failing, missing, or unverifiable required checks block the merge. If no checks are required, confirm that from the live settings rather than treating absent checks as a pass.
 - Any required review approvals and conversation resolutions are satisfied.
 - `main` has not advanced since the final sync. If it has, merge the new `origin/main` tip into the work branch and restart the tests and review.
 
-The repository has no general test workflow. `publish-images` publishes a candidate only when the `build-image` label is applied to a same-repository PR, and publishes production images on pushes to `main` (`.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`). Do not add the candidate label merely to manufacture a check; candidate publication is an external package publication and needs explicit user authorization.
+The `tests` workflow runs on PRs targeting `main`. `publish-images` only builds an image after Python Semantic Release creates a release; ordinary non-release merges do not publish images (`.github/workflows/tests.yml`, `.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`). Do not add candidate-image labels to manufacture a check; candidate publishing has been retired.
 
-Merging to `main` automatically publishes `latest` and the full commit SHA to GHCR, but does not deploy the live stack (`.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`, `docs/deployment.md`). Before the merge, disclose this side effect and obtain explicit authorization for that package publication if the user's landing request does not already authorize it. Do not perform a live deployment or change package visibility.
+A release-worthy merge to `main` automatically creates a GitHub Release and publishes GHCR SemVer aliases (`X.Y.Z`, `X.Y`, `X`, and `latest`); it does not deploy the live stack (`.github/workflows/publish-images.yml`, `docs/ghcr-publishing.md`, `docs/deployment.md`). Before the merge, disclose this side effect and obtain explicit authorization for release and package publication if the user's landing request does not already authorize it. Do not perform a live deployment or change package visibility.
+
+For any release workflow that pushes a version-stamp commit directly to `main`, verify that its token's actor is allowed by the effective branch rules. `contents: write` or a write-capable token grants repository permission but does not bypass a PR-only rule. A ruleset bypass applies to its actor, not to one workflow. This personal-account repository rejects the built-in GitHub Actions app as a repository-ruleset bypass actor; use a dedicated GitHub App installed only on this repository, give it only the required permissions, and use its installation token for release writes. Any workflow with access to the App's private key can mint that token. Configure the App and its ruleset bypass before merging a release-worthy change. If human contributors, including privileged repository roles, must always use PRs, inspect and remove any repository-role bypass actor. If the release workflow cannot make the direct push, stop before merging and explain that the post-merge release will be blocked at version stamping. Do not merge just to test the push, and never use an administrator bypass.
 
 ## Merge and confirm
 
