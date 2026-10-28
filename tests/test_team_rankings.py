@@ -9,12 +9,15 @@ class TableRowsParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.rows: list[list[str]] = []
+        self.row_attributes: list[dict[str, str | None]] = []
         self._row: list[str] | None = None
+        self._row_attributes: dict[str, str | None] | None = None
         self._cell: list[str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "tr":
             self._row = []
+            self._row_attributes = dict(attrs)
         elif tag in {"th", "td"} and self._row is not None:
             self._cell = []
 
@@ -28,7 +31,9 @@ class TableRowsParser(HTMLParser):
             self._cell = None
         elif tag == "tr" and self._row is not None:
             self.rows.append(self._row)
+            self.row_attributes.append(self._row_attributes or {})
             self._row = None
+            self._row_attributes = None
 
 
 def _add_following_ratings(engine, tables, team_ids: tuple[uuid.UUID, uuid.UUID]) -> None:
@@ -164,7 +169,28 @@ def test_team_rankings_show_latest_ratings_in_descending_order(configured_site) 
     assert "2100" not in response.text
 
 
-def test_team_rankings_share_tie_ranks_and_include_unranked_and_single_member_teams(configured_site) -> None:
+def test_team_rankings_round_ratings_without_changing_rank_order(configured_site) -> None:
+    client, engine, tables, *_ = configured_site
+    with Session(engine) as session:
+        team_matches = session.query(tables.TeamMatch).order_by(tables.TeamMatch.team_id).all()
+        for team_match, rating in zip(team_matches, (1645.6, 1645.8)):
+            session.query(tables.TeamRating).filter_by(team_match_id=team_match.id).one().rating = rating
+        session.commit()
+
+    response = client.get("/team")
+
+    assert response.status_code == 200
+    parser = TableRowsParser()
+    parser.feed(response.text)
+    rows = [row for row in parser.rows if len(row) == 3 and row[0] != "Rank"]
+
+    assert [(row[0], row[1], row[2]) for row in rows] == [
+        ("1", "Player 3 & Player 4", "1646"),
+        ("2", "Player 1 & Player 2", "1646"),
+    ]
+
+
+def test_team_rankings_hide_single_member_teams_and_keep_ties_and_unranked_teams(configured_site) -> None:
     client, engine, tables, _, existing_team_ids, *_ = configured_site
     with Session(engine) as session:
         for rating in session.query(tables.TeamRating).all():
@@ -174,7 +200,7 @@ def test_team_rankings_share_tie_ranks_and_include_unranked_and_single_member_te
     one_member_team = _add_team(engine, tables, 103, [(5, "Zara")])
     alphabetically_first_team = _add_team(engine, tables, 104, [(6, "Abbey"), (7, "Ben")])
     lower_rated_team = _add_team(engine, tables, 105, [(8, "Maya"), (9, "Noah")])
-    unrated_team = _add_team(engine, tables, 106, [(10, "Unrated")])
+    unrated_team = _add_team(engine, tables, 106, [(10, "Unrated"), (11, "Teammate")])
     _record_match(engine, tables, 202, (one_member_team, existing_team_ids[0]), (1600, 1600))
     _record_match(engine, tables, 203, (alphabetically_first_team, existing_team_ids[1]), (1600, 1600))
     _record_match(engine, tables, 204, (lower_rated_team, existing_team_ids[0]), (1400, 1600))
@@ -188,18 +214,17 @@ def test_team_rankings_share_tie_ranks_and_include_unranked_and_single_member_te
     parser.feed(response.text)
     rows = [row for row in parser.rows if len(row) == 3 and row[0] != "Rank"]
 
-    assert [row[0] for row in rows] == ["1", "1", "1", "1", "5", "Unranked"]
+    assert [row[0] for row in rows] == ["1", "1", "1", "4", "Unranked"]
     assert [row[1] for row in rows] == [
         "Abbey & Ben",
         "Player 1 & Player 2",
         "Player 3 & Player 4",
-        "Zara",
         "Maya & Noah",
-        "Unrated",
+        "Teammate & Unrated",
     ]
-    assert rows[3][2] == "1600"
-    assert rows[4][2] == "1400"
-    assert rows[5][2] == "—"
+    assert "Zara" not in response.text
+    assert rows[3][2] == "1400"
+    assert rows[4][2] == "—"
 
 
 def test_team_rankings_reflect_ratings_after_a_match_is_removed(configured_site) -> None:
@@ -278,3 +303,133 @@ def test_team_rankings_show_an_empty_state_when_no_teams_are_recorded(configured
     assert "Team Rankings" in response.text
     assert "No teams have been recorded yet." in response.text
     assert "<table" not in response.text
+
+
+def test_ranked_team_links_to_recent_match_history(configured_site) -> None:
+    client, engine, tables, _, team_ids, *_ = configured_site
+    _add_following_ratings(engine, tables, team_ids)
+
+    rankings = client.get("/team")
+
+    assert rankings.status_code == 200
+    assert f'href="/team/{team_ids[0]}"' in rankings.text
+    rankings_parser = TableRowsParser()
+    rankings_parser.feed(rankings.text)
+    team_row_index = next(index for index, row in enumerate(rankings_parser.rows) if row[1] == "Player 1 & Player 2")
+    assert rankings_parser.row_attributes[team_row_index].get("onclick") == (
+        f"window.location.href='/team/{team_ids[0]}'"
+    )
+
+    history = client.get(f"/team/{team_ids[0]}")
+
+    assert history.status_code == 200
+    assert "Player 1" in history.text
+    assert "Player 2" in history.text
+    assert "Recent matches" in history.text
+    assert f'href="/match/{uuid.UUID(int=202)}"' in history.text
+    assert 'id="team-rating-history-chart"' in history.text
+
+    parser = TableRowsParser()
+    parser.feed(history.text)
+    match_rows = [row for row in parser.rows if len(row) == 5 and row[0] != "Played at"]
+
+    assert match_rows[0] == ["2024-02-01 12:00:00", "Player 3 & Player 4", "2–5", "Loss", "1600"]
+
+
+def test_team_details_include_rating_history_graph(configured_site) -> None:
+    client, engine, tables, _, team_ids, *_ = configured_site
+    _add_following_ratings(engine, tables, team_ids)
+
+    response = client.get(f"/team/{team_ids[0]}")
+
+    assert response.status_code == 200
+    assert 'id="team-rating-history-chart"' in response.text
+    assert "Current rating: 1600" in response.text
+    assert "Total Matches: 2" in response.text
+    assert "Lifetime Win Rate: 1 win / 2 matches (50.0%)" in response.text
+
+
+def test_team_match_history_paginates_like_player_ratings(configured_site) -> None:
+    client, engine, tables, _, team_ids, *_ = configured_site
+    for match_number in range(202, 212):
+        _record_match(engine, tables, match_number, team_ids, (1600, 1700))
+
+    page_one = client.get(f"/team/{team_ids[0]}")
+
+    assert page_one.status_code == 200
+    assert "Page 1 of 2" in page_one.text
+    assert f'hx-post="/team/{team_ids[0]}/matches/2"' in page_one.text
+
+    page_two = client.post(f"/team/{team_ids[0]}/matches/2")
+
+    assert page_two.status_code == 200
+    assert "Page 2 of 2" in page_two.text
+    assert "2024-01-02 12:00:00" in page_two.text
+
+    out_of_range_page = client.post(f"/team/{team_ids[0]}/matches/99")
+
+    assert out_of_range_page.status_code == 200
+    assert "Page 2 of 2" in out_of_range_page.text
+
+    page_zero = client.post(f"/team/{team_ids[0]}/matches/0")
+
+    assert page_zero.status_code == 200
+    assert "Page 1 of 2" in page_zero.text
+
+
+def test_team_details_return_not_found_for_invalid_or_unknown_ids(configured_site) -> None:
+    client, *_ = configured_site
+
+    invalid_id = client.get("/team/not-a-uuid")
+    unknown_id = client.get(f"/team/{uuid.UUID(int=999)}")
+
+    assert invalid_id.status_code == 404
+    assert unknown_id.status_code == 404
+
+
+def test_team_details_show_an_empty_state_for_a_team_without_matches(configured_site) -> None:
+    client, engine, tables, *_ = configured_site
+    team_id = _add_team(engine, tables, 107, [(12, "Unplayed A"), (13, "Unplayed B")])
+
+    response = client.get(f"/team/{team_id}")
+
+    assert response.status_code == 200
+    assert "Unplayed A" in response.text
+    assert "Unplayed B" in response.text
+    assert "No matches have been recorded for this team yet." in response.text
+    assert "Current rating: Unranked" in response.text
+    assert "Total Matches: 0" in response.text
+    assert "No matches yet" in response.text
+    assert 'id="team-rating-history-chart"' in response.text
+    assert "<table" not in response.text
+
+
+def test_single_player_teams_keep_ratings_but_are_not_listed(configured_site) -> None:
+    client, engine, tables, *_ = configured_site
+    submitted = client.post(
+        "/match/submit",
+        json={
+            "player_1": str(uuid.UUID(int=1)),
+            "player_3": str(uuid.UUID(int=3)),
+            "score_team_1": 4,
+            "score_team_2": 1,
+            "date": "2024-01-03T12:00:00",
+        },
+    )
+
+    assert submitted.status_code == 200
+    match_id = uuid.UUID(submitted.headers["HX-Push-Url"].rsplit("/", 1)[1])
+    with Session(engine) as session:
+        team_matches = session.query(tables.TeamMatch).filter_by(match_id=match_id).all()
+        assert len(team_matches) == 2
+        single_player_team_ids = [team_match.team_id for team_match in team_matches]
+        assert all(session.get(tables.Team, team_id).team_player_2_id is None for team_id in single_player_team_ids)
+        assert all(
+            session.query(tables.TeamRating).filter_by(team_match_id=team_match.id).count() == 1
+            for team_match in team_matches
+        )
+
+    rankings = client.get("/team")
+
+    assert rankings.status_code == 200
+    assert all(f'href="/team/{team_id}"' not in rankings.text for team_id in single_player_team_ids)

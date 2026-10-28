@@ -14,4 +14,4 @@ The proportion of a player's recorded matches that the player won, expressed as 
 _Avoid_: Winrate
 
 **Team ranking**:
-The competition ranking of teams based on their latest recorded rating; teams with equal current ratings share a rank.
+The competition ranking of two-player teams based on their latest recorded rating; teams with equal current ratings share a rank. Single-player teams remain part of rating history but are not shown in the Team Rankings list.
