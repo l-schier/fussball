@@ -34,7 +34,9 @@ def test_production_image_is_published_only_after_a_semantic_release() -> None:
     assert preview["with"]["github_token"] == "${{ steps.release-token.outputs.token }}"
     assert preview["with"]["no_operation_mode"] == "true"
     assert preview["with"]["changelog"] == "false"
-    baseline_check = next(step for step in release["steps"] if "historical release baseline" in step.get("name", ""))["run"]
+    baseline_check = next(step for step in release["steps"] if "historical release baseline" in step.get("name", ""))[
+        "run"
+    ]
     assert "v3.4.1" in baseline_check
     assert "94c8403275e2e8f34314d30e83d6d5b40b8f99c6" in baseline_check
     release_action = next(step for step in release["steps"] if step.get("id") == "release")
@@ -47,7 +49,9 @@ def test_production_image_is_published_only_after_a_semantic_release() -> None:
     assert publish["needs"] == "release"
     assert publish["if"] == "needs.release.outputs.released == 'true'"
     assert publish["permissions"] == {"contents": "read", "packages": "write"}
-    registry_login = next(step for step in publish["steps"] if step.get("name") == "Log in to GitHub Container Registry")
+    registry_login = next(
+        step for step in publish["steps"] if step.get("name") == "Log in to GitHub Container Registry"
+    )
     assert registry_login["with"]["password"] == "${{ secrets.GITHUB_TOKEN }}"
     checkout = next(step for step in publish["steps"] if step.get("uses", "").startswith("actions/checkout@"))
     assert checkout["with"]["ref"] == "${{ needs.release.outputs.commit_sha }}"
@@ -66,12 +70,12 @@ def test_production_image_is_published_only_after_a_semantic_release() -> None:
     assert "Production release image" in build["with"]["labels"]
 
 
-def test_semantic_release_config_matches_the_backfilled_version_and_bump_policy() -> None:
+def test_semantic_release_config_uses_stable_version_and_bump_policy() -> None:
     project = loads((PROJECT_ROOT / "pyproject.toml").read_text())
     release = project["tool"]["semantic_release"]
     commit_rules = release["commit_parser_options"]
 
-    assert project["project"]["version"] == "3.4.1"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", project["project"]["version"])
     assert release["tag_format"] == "v{version}"
     assert release["version_toml"] == ["pyproject.toml:project.version"]
     build_commands = [line.strip() for line in release["build_command"].splitlines() if line.strip()]
