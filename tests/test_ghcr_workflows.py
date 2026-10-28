@@ -71,7 +71,7 @@ def test_semantic_release_config_matches_the_backfilled_version_and_bump_policy(
     release = project["tool"]["semantic_release"]
     commit_rules = release["commit_parser_options"]
 
-    assert project["project"]["version"] == "3.4.1"
+    assert project["project"]["version"] == "3.5.0"
     assert release["tag_format"] == "v{version}"
     assert release["version_toml"] == ["pyproject.toml:project.version"]
     build_commands = [line.strip() for line in release["build_command"].splitlines() if line.strip()]
