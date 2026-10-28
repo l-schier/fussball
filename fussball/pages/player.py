@@ -18,16 +18,9 @@ from uiwiz import Page, PageRouter, ui
 
 from pages import routes
 from pages.fragment.ui_player import render_player, render_player_list, render_player_ratings_table_content
-from pages.layout import Layout
+from pages.page_layout import PageContentWidth
 
 player_router = PageRouter(prefix="/player")
-
-
-# custom width for player details
-class PageContentWidth(Layout):
-    def __init__(self) -> None:
-        super().__init__()
-        self.max_width = "max-w-7xl"
 
 
 class PlayerDTO(BaseModel):

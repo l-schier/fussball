@@ -10,6 +10,7 @@ from pages.default import default_route
 from pages.layout import Layout, page_routes
 from pages.match import match_router as match_route
 from pages.player import player_router
+from pages.teams import team_router
 from starlette.middleware.sessions import SessionMiddleware
 from uiwiz import UiwizApp, ui
 from uiwiz.frame import Frame
@@ -44,6 +45,7 @@ def create_app(app_settings: Settings = settings) -> UiwizApp:
     app.include_router(default_route)
     app.include_router(match_route)
     app.include_router(player_router)
+    app.include_router(team_router)
     app.include_router(admin_router)
 
     @app.get("/health")
